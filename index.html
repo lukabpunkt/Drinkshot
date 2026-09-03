@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1"
+    />
+
+    <!-- Architektur §10: keine Netzwerk-Calls zur Laufzeit, keine Analytics, keine Cookies. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+
+    <title>Drinkshot</title>
+    <meta name="description" content="Pass-the-Phone-Trinkspiel für 2–8 Personen." />
+
+    <!-- Art Direction §2.3: dark-only -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0F0E1A" />
+
+    <!-- PWA / iOS -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Drinkshot" />
+    <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+
+    <link rel="preload" href="./fonts/luckiest-guy-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/nunito-var.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <!-- App-Root: 100dvh, overflow hidden, Safe-Areas (Architektur §8) -->
+    <div id="app"></div>
+
+    <!-- Landscape-Overlay auf Mobile; Texte werden aus i18n gefuellt (CLAUDE.md) -->
+    <div class="orientation-lock" role="alertdialog" aria-live="polite">
+      <div class="orientation-lock__icon" aria-hidden="true">📱</div>
+      <p class="orientation-lock__title" data-i18n="orientation.headline"></p>
+      <p class="orientation-lock__body" data-i18n="orientation.body"></p>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

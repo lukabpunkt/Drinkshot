@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "Drinkshot",
+    "tagline": "Setz. Renn. Trink."
+  },
+  "common": {
+    "back": "Zurück",
+    "close": "Schließen",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "ok": "Alles klar",
+    "sips_one": "Schluck",
+    "sips_other": "Schlücke"
+  },
+  "title": {
+    "play": "Spielen",
+    "rules": "Regeln",
+    "settings": "Einstellungen",
+    "soundOn": "Ton an",
+    "soundOff": "Ton aus"
+  },
+  "disclaimer": {
+    "headline": "Kurz vorweg",
+    "body": "Ab 18. Trink verantwortungsvoll. Wasser ist auch ein Getränk.",
+    "accept": "Verstanden"
+  },
+  "lobby": {
+    "headline": "Wer spielt mit?",
+    "addPlayer": "+ Spieler",
+    "removePlayer": "{name} entfernen",
+    "namePlaceholder": "Name",
+    "start": "Los geht's!",
+    "mode": "Modus",
+    "duration": "Dauer",
+    "tooFewPlayers": "Zu zweit ist's ein Duell, allein ist's traurig. Füge noch jemanden hinzu.",
+    "maxPlayers": "Mehr als {max} passen nicht ums Handy."
+  },
+  "pass": {
+    "handOver": "Gib das Handy an",
+    "tapWhenReady": "Tippe, wenn nur du aufs Display schaust"
+  },
+  "bet": {
+    "headline": "Wie viele Schlücke setzt du?",
+    "hint": "Mehr Einsatz = höheres Risiko",
+    "confirm": "Bestätigen & verstecken",
+    "increase": "Einsatz erhöhen",
+    "decrease": "Einsatz senken",
+    "risk": {
+      "careful": "Vorsichtig",
+      "bold": "Mutig",
+      "insane": "Wahnsinnig"
+    },
+    "blind": "Blind gesetzt. Viel Glück."
+  },
+  "arena": {
+    "hud": "RUNDE {round} · {count} ZIELE",
+    "lock": "LOCK",
+    "skip": "Tippen zum Überspringen",
+    "abortRound": "Runde abbrechen?",
+    "abortConfirm": "Ja, abbrechen",
+    "abortCancel": "Weiterspielen"
+  },
+  "result": {
+    "drinks": "{name} trinkt {sips}!",
+    "miracle": "Niemand trinkt. Wunder passieren.",
+    "miracleBadge": "Legende",
+    "allBets": "Alle Einsätze",
+    "tableName": "Name",
+    "tableBet": "Einsatz",
+    "tableChance": "Chance",
+    "scoreboard": "Heute getrunken",
+    "nextRound": "Nächste Runde",
+    "changePlayers": "Spieler ändern",
+    "changeMode": "Modus ändern",
+    "zone": {
+      "head": "Kopfschuss!",
+      "body": "Mitten in die Brust!",
+      "leg": "Ins Bein… und nochmal!",
+      "butt": "Volltreffer, Hosenboden!",
+      "miss": "Erst daneben. Dann doch nicht.",
+      "miracle": "Glück gehabt!"
+    }
+  },
+  "settings": {
+    "headline": "Einstellungen",
+    "sound": "Ton",
+    "music": "Musik",
+    "haptics": "Vibration",
+    "duration": "Dauer der Show",
+    "mode": "Modus",
+    "miracles": "Wunder erlauben",
+    "lowEffects": "Reduzierte Effekte",
+    "language": "Sprache",
+    "resetSession": "Session zurücksetzen",
+    "durationOption": {
+      "short": "Kurz",
+      "normal": "Normal",
+      "long": "Lang"
+    }
+  },
+  "mode": {
+    "classic": "Klassik",
+    "classicHint": "Der Getroffene trinkt seinen eigenen Einsatz.",
+    "distributor": "Verteiler",
+    "distributorHint": "Alle anderen trinken den Einsatz des Getroffenen.",
+    "suddenDeath": "Sudden Death",
+    "suddenDeathHint": "Wer getroffen wird, ist raus. Letzter Überlebender verteilt.",
+    "doubleTap": "Double Tap",
+    "doubleTapHint": "Zwei Schüsse, zwei Opfer."
+  },
+  "rules": {
+    "headline": "Regeln",
+    "card1Title": "Setzen",
+    "card1Body": "Jeder setzt heimlich 1 bis 10 Schlücke. Niemand sieht deine Zahl.",
+    "card2Title": "Zielen",
+    "card2Body": "Ein Scharfschütze visiert die Männchen an. Je mehr du setzt, desto größer deine Chance getroffen zu werden.",
+    "card3Title": "Trinken",
+    "card3Body": "Wer getroffen wird, trinkt seinen Einsatz. Danach werden alle Einsätze aufgedeckt.",
+    "card4Title": "Nochmal",
+    "card4Body": "Nächste Runde, gleiche Leute. Der Abend hat ein Scoreboard."
+  },
+  "orientation": {
+    "headline": "Bitte Handy drehen",
+    "body": "Drinkshot läuft im Hochformat."
+  },
+  "pwa": {
+    "updateAvailable": "Neue Version verfügbar.",
+    "reload": "Neu laden",
+    "offlineReady": "Läuft jetzt auch offline."
+  },
+  "error": {
+    "generic": "Da ist was schiefgelaufen.",
+    "retry": "Nochmal versuchen"
+  }
+}

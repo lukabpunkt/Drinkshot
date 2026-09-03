@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "Drinkshot",
+    "tagline": "Bet. Run. Drink."
+  },
+  "common": {
+    "back": "Back",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "ok": "Got it",
+    "sips_one": "sip",
+    "sips_other": "sips"
+  },
+  "title": {
+    "play": "Play",
+    "rules": "Rules",
+    "settings": "Settings",
+    "soundOn": "Sound on",
+    "soundOff": "Sound off"
+  },
+  "disclaimer": {
+    "headline": "One quick thing",
+    "body": "18+. Drink responsibly. Water counts as a drink too.",
+    "accept": "Understood"
+  },
+  "lobby": {
+    "headline": "Who's playing?",
+    "addPlayer": "+ Player",
+    "removePlayer": "Remove {name}",
+    "namePlaceholder": "Name",
+    "start": "Let's go!",
+    "mode": "Mode",
+    "duration": "Duration",
+    "tooFewPlayers": "Two makes a duel, one makes it sad. Add someone else.",
+    "maxPlayers": "More than {max} won't fit around one phone."
+  },
+  "pass": {
+    "handOver": "Hand the phone to",
+    "tapWhenReady": "Tap when nobody else is looking"
+  },
+  "bet": {
+    "headline": "How many sips do you bet?",
+    "hint": "Higher bet = higher risk",
+    "confirm": "Confirm & hide",
+    "increase": "Increase bet",
+    "decrease": "Decrease bet",
+    "risk": {
+      "careful": "Careful",
+      "bold": "Bold",
+      "insane": "Reckless"
+    },
+    "blind": "Bet placed blind. Good luck."
+  },
+  "arena": {
+    "hud": "ROUND {round} · {count} TARGETS",
+    "lock": "LOCK",
+    "skip": "Tap to skip",
+    "abortRound": "Abort the round?",
+    "abortConfirm": "Yes, abort",
+    "abortCancel": "Keep playing"
+  },
+  "result": {
+    "drinks": "{name} drinks {sips}!",
+    "miracle": "Nobody drinks. Miracles happen.",
+    "miracleBadge": "Legend",
+    "allBets": "All bets",
+    "tableName": "Name",
+    "tableBet": "Bet",
+    "tableChance": "Chance",
+    "scoreboard": "Tonight's total",
+    "nextRound": "Next round",
+    "changePlayers": "Change players",
+    "changeMode": "Change mode",
+    "zone": {
+      "head": "Headshot!",
+      "body": "Straight to the chest!",
+      "leg": "In the leg… and again!",
+      "butt": "Bullseye, right in the seat!",
+      "miss": "Missed. Then didn't.",
+      "miracle": "Lucky one!"
+    }
+  },
+  "settings": {
+    "headline": "Settings",
+    "sound": "Sound",
+    "music": "Music",
+    "haptics": "Haptics",
+    "duration": "Show duration",
+    "mode": "Mode",
+    "miracles": "Allow miracles",
+    "lowEffects": "Reduced effects",
+    "language": "Language",
+    "resetSession": "Reset session",
+    "durationOption": {
+      "short": "Short",
+      "normal": "Normal",
+      "long": "Long"
+    }
+  },
+  "mode": {
+    "classic": "Classic",
+    "classicHint": "The victim drinks their own bet.",
+    "distributor": "Distributor",
+    "distributorHint": "Everyone else drinks the victim's bet.",
+    "suddenDeath": "Sudden Death",
+    "suddenDeathHint": "Get hit, you're out. Last one standing distributes.",
+    "doubleTap": "Double Tap",
+    "doubleTapHint": "Two shots, two victims."
+  },
+  "rules": {
+    "headline": "Rules",
+    "card1Title": "Bet",
+    "card1Body": "Everyone secretly bets 1 to 10 sips. Nobody sees your number.",
+    "card2Title": "Aim",
+    "card2Body": "A sniper picks a target. The more you bet, the likelier you get hit.",
+    "card3Title": "Drink",
+    "card3Body": "Whoever gets hit drinks their bet. Then all bets are revealed.",
+    "card4Title": "Again",
+    "card4Body": "Next round, same people. The night keeps a scoreboard."
+  },
+  "orientation": {
+    "headline": "Please rotate your phone",
+    "body": "Drinkshot runs in portrait."
+  },
+  "pwa": {
+    "updateAvailable": "A new version is available.",
+    "reload": "Reload",
+    "offlineReady": "Ready to run offline."
+  },
+  "error": {
+    "generic": "Something went wrong.",
+    "retry": "Try again"
+  }
+}

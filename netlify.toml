@@ -1,0 +1,15 @@
+# Alternative zu GitHub Pages (Architektur §11).
+# Netlify serviert aus dem Root, daher `base` ohne /Drinkshot/ bauen.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  DRINKSHOT_BASE = "/"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

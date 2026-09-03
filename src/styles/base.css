@@ -1,0 +1,192 @@
+/*
+ * Basis-Layout & Reset.
+ * Quelle: docs/03-ARCHITECTURE.md §8 (Layout & Responsiveness).
+ */
+
+@font-face {
+  font-family: 'Luckiest Guy';
+  src: url('/fonts/luckiest-guy-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Nunito ist ein Variable Font — eine Datei deckt 600 und 800 ab (Art Direction §3). */
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/nunito-var.woff2') format('woff2-variations');
+  font-weight: 200 1000;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--c-bg-deep);
+  color: var(--c-paper);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--fs-md);
+  line-height: 1.35;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Der Hintergrund ausserhalb des Portrait-Frames (Desktop, Architektur §8). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 25%, rgb(255 184 0 / 6%), transparent 42%),
+    radial-gradient(circle at 78% 72%, rgb(255 45 85 / 6%), transparent 40%), var(--c-bg-deep);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* ------------------------------------------------------------------ */
+/* App-Root                                                            */
+/* ------------------------------------------------------------------ */
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--c-bg-deep);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+/* Desktop: 9:16-Portrait-Frame, zentriert ("Handy im Browser"-Look). */
+@media (min-width: 768px) {
+  body {
+    display: grid;
+    place-items: center;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  #app {
+    width: min(var(--frame-max-width), calc(100dvh * 9 / 16));
+    height: min(854px, 100dvh - 48px);
+    aspect-ratio: var(--frame-aspect);
+    border-radius: var(--radius-frame);
+    border: 2px solid rgb(255 248 231 / 8%);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Landscape-Overlay auf Mobile (Architektur §8)                        */
+/* ------------------------------------------------------------------ */
+
+.orientation-lock {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-orientation);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--c-bg-deep);
+}
+
+.orientation-lock__icon {
+  font-size: var(--fs-2xl);
+  animation: rotate-hint 2.4s var(--ease-snappy) infinite;
+}
+
+.orientation-lock__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  color: var(--c-accent);
+}
+
+.orientation-lock__body {
+  font-size: var(--fs-sm);
+  color: rgb(255 248 231 / 70%);
+}
+
+/* Nur auf echten Mobilgeraeten im Querformat, nicht auf dem Desktop. */
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
+  .orientation-lock {
+    display: flex;
+  }
+}
+
+@keyframes rotate-hint {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orientation-lock__icon {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilities                                                           */
+/* ------------------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

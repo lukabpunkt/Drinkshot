@@ -1,0 +1,63 @@
+/*
+ * Komponenten-Styles (Art Direction §4).
+ *
+ * M0 enthaelt nur das Boot-Layout (Titel-Platzhalter).
+ * TODO(M1): Sticker-Button, PlayerBadge, BetStepper, BottomSheet, Toast, Wipe-Transition.
+ */
+
+/* --- Boot-Screen: schwarze Seite mit "DRINKSHOT" (Roadmap M0) --- */
+
+.boot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.boot__logo {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 14vw, var(--fs-hero));
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--c-accent);
+  text-shadow: var(--sticker-shadow);
+  -webkit-text-stroke: var(--sticker-stroke) var(--c-ink);
+  paint-order: stroke fill;
+  animation: logo-wobble 4s ease-in-out infinite;
+}
+
+.boot__tagline {
+  font-size: var(--fs-sm);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(255 248 231 / 62%);
+}
+
+.boot__version {
+  position: absolute;
+  bottom: calc(var(--space-4) + var(--safe-bottom));
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  color: rgb(255 248 231 / 32%);
+}
+
+@keyframes logo-wobble {
+  0%,
+  100% {
+    transform: rotate(-1.5deg) scale(1);
+  }
+  50% {
+    transform: rotate(1.5deg) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot__logo {
+    animation: none;
+  }
+}

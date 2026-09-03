@@ -1,0 +1,12 @@
+dist
+coverage
+dev-dist
+node_modules
+public/atlas
+playwright-report
+test-results
+package-lock.json
+
+# Planungsdokumente bleiben so, wie sie geschrieben wurden.
+docs/
+CLAUDE.md

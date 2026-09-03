@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Requisit "grass1" — Grasbuschel 1. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="64" height="48">
+  <g fill="none" stroke="#1A1024" stroke-width="9" stroke-linecap="round">
+    <path d="M32 44 C30 30 24 22 16 16"/><path d="M32 44 C32 28 34 18 36 8"/><path d="M32 44 C36 32 42 24 50 18"/>
+  </g>
+  <g fill="none" stroke="#4EA544" stroke-width="4" stroke-linecap="round">
+    <path d="M32 44 C30 30 24 22 16 16"/><path d="M32 44 C32 28 34 18 36 8"/><path d="M32 44 C36 32 42 24 50 18"/>
+  </g>
+</svg>

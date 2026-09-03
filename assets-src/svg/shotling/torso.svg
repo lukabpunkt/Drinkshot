@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Torso: Bohnenform, breiter unten als oben. Traegt das Farb-Symbol.
+     Grauer Bogen unten = zweite Cel-Stufe. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112" width="96" height="112">
+  <defs>
+    <clipPath id="torsoClip">
+      <path d="M48 13 C64 13 71 24 73 39 C75 55 79 70 79 82 C79 96 66 100 48 100 C30 100 17 96 17 82 C17 70 21 55 23 39 C25 24 32 13 48 13 Z"/>
+    </clipPath>
+  </defs>
+  <path d="M48 8 C66 8 76 20 78 38 C80 54 84 70 84 82 C84 99 68 105 48 105 C28 105 12 99 12 82 C12 70 16 54 18 38 C20 20 30 8 48 8 Z"
+        fill="#FFFFFF" stroke="#1A1024" stroke-width="10" stroke-linejoin="round"/>
+  <g clip-path="url(#torsoClip)">
+    <ellipse cx="48" cy="126" rx="60" ry="40" fill="#D2D2D2"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "beanie" — Muetze mit Bommel. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 10)">
+  <path d="M22 48 C22 24 36 12 56 12 C76 12 90 24 90 48 Z" fill="#A55EEA" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="16" y="42" width="80" height="14" rx="7" fill="#7B3FBF" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="56" cy="10" r="8" fill="#FFF8E7" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

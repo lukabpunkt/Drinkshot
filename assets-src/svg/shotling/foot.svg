@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Schuh: immer ink, wird nie getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 24" width="44" height="24">
+  <path d="M5 19 C5 9 12 3 22 3 C33 3 39 9 39 19 Z"
+        fill="#1A1024" stroke="#1A1024" stroke-width="6" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "party" — Partyhut mit Bommel. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 14)">
+  <path d="M56 6 L82 52 L30 52 Z" fill="#FF6B9D" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="56" cy="8" r="9" fill="#FFD32A" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M38 40 L74 40" stroke="#1A1024" stroke-width="6" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Symbol "square" — Farbenblind-Fallback auf dem Torso (GDD §3.1). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <g fill="#1A1024"><rect x="10" y="10" width="28" height="28" rx="5"/></g>
+</svg>

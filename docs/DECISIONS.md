@@ -45,3 +45,18 @@ Kontext: Sudden Death braucht "wer ist raus", das Datenmodell in §4 kennt aber 
 
 ## ADR-12 · 2026-09-03 · Haptik in `src/ui/haptics.ts`
 Kontext: `navigator.vibrate` wird von Screens und Komponenten gebraucht, passt aber weder in `core/` (kein Spielzustand) noch in `audio/`. Entscheidung: eigenes Modul `src/ui/haptics.ts` mit benannten Mustern (`tap`, `confirm`, `shot`, `reveal`). Konsequenz: Eine Datei mehr als in §2 gelistet (siehe ADR-5); dafür schlägt Haptik auf iOS still fehl statt irgendwo zu werfen.
+
+## ADR-13 · 2026-09-03 · Shotling-Größe skaliert mit der Spielerzahl
+Kontext: Art Direction §5 nennt ~90 px Höhe; bei acht Männchen in der Laufzone wird daraus ein unlesbares Knäuel, bei zweien wirken sie verloren. Entscheidung: `shotlingHeightFor(n)` interpoliert linear zwischen 250 (2 Spieler) und 200 Welteinheiten (8 Spieler); der Mindestabstand folgt als Anteil der Höhe. Konsequenz: Duelle sehen groß aus, Achterrunden bleiben lesbar — jede Silhouette einzeln erkennbar (Audit A2).
+
+## ADR-14 · 2026-09-03 · Cel-Shading als eingebackener Grauwert
+Kontext: Art Direction §1 fordert zwei Cel-Stufen je Fläche, ein zweites Sprite je Körperteil würde die Draw-Calls verdoppeln. Entscheidung: Die Schattenstufe wird als Grau (`#D2D2D2`) ins weiße Sprite gezeichnet; PIXI multipliziert den Tint, also wird daraus automatisch die dunklere Spielerfarbe. Konsequenz: Zwei Stufen ohne ein einziges zusätzliches Sprite, funktioniert für alle acht Farben ohne Handarbeit.
+
+## ADR-15 · 2026-09-03 · `pixi.js/unsafe-eval` statt CSP-Lockerung
+Kontext: PIXI v8 baut Shader- und Uniform-Code per `new Function`; unsere CSP (Architektur §10) verbietet `unsafe-eval`, die Arena starb beim ersten Render. Entscheidung: den eval-freien Pfad importieren, statt die CSP aufzuweichen. Zusätzlich braucht `connect-src` ein `data:`, weil PIXI seine 1×1-Default-Textur als data-URL nachlädt. Konsequenz: CSP bleibt streng, minimal langsamerer Shader-Aufbau beim Start (einmalig, nicht messbar).
+
+## ADR-16 · 2026-09-03 · Separation in zwei Stufen
+Kontext: Weiche Steering-Kräfte heben sich im Knäuel gegenseitig auf — acht Männchen klumpten trotz Separation zusammen. Entscheidung: weiches Ausweichen in `update()` für natürliche Bewegung, plus `resolveOverlaps()` als harte Positionskorrektur mit vier Relaxations-Durchgängen nach dem Integrationsschritt. Konsequenz: Der Mindestabstand ist garantiert und unit-testbar (1 000 Schritte, 8 Männchen), die Bewegung wirkt trotzdem nicht mechanisch.
+
+## ADR-17 · 2026-09-03 · Atlas meldet seine Auflösung selbst
+Kontext: `free-tex-packer-core` schreibt immer `meta.scale: 1`. Auf Retina-Geräten lädt die App den @2x-Atlas — PIXI rechnete dessen Texturpixel dadurch 1:1 in Welteinheiten um und zeichnete **alles doppelt so groß**, lautlos und nur auf echten Geräten. Entscheidung: `build-atlas.mjs` schreibt `meta.scale` passend zum Faktor in die JSON. Konsequenz: @1x und @2x liefern identische Weltgrößen; der Fehler kann nicht zurückkommen, weil die Metadaten aus derselben Variable stammen wie das Rendering.

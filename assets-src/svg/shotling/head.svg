@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Kopf: runde Bohne mit Ohren-Bumps. Weiss = wird getintet, Outline bleibt dunkel.
+     Der graue Bogen unten ist die zweite Cel-Stufe (Art Direction §1). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <clipPath id="headClip">
+      <ellipse cx="64" cy="66" rx="48" ry="46"/>
+    </clipPath>
+  </defs>
+  <g fill="#FFFFFF" stroke="#1A1024" stroke-width="10" stroke-linejoin="round">
+    <ellipse cx="17" cy="72" rx="11" ry="14"/>
+    <ellipse cx="111" cy="72" rx="11" ry="14"/>
+    <ellipse cx="64" cy="66" rx="53" ry="51"/>
+  </g>
+  <g clip-path="url(#headClip)">
+    <ellipse cx="64" cy="140" rx="70" ry="52" fill="#D2D2D2"/>
+  </g>
+</svg>

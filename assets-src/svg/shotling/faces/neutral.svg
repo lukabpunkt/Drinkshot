@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gesicht "neutral" — neutral: offene Augen, kleiner Mund. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" width="96" height="64">
+  <ellipse cx="27" cy="26" rx="13" ry="15" fill="#FFFFFF" stroke="#1A1024" stroke-width="5"/>
+  <ellipse cx="69" cy="26" rx="13" ry="15" fill="#FFFFFF" stroke="#1A1024" stroke-width="5"/>
+  <circle cx="29" cy="29" r="6" fill="#1A1024"/>
+  <circle cx="71" cy="29" r="6" fill="#1A1024"/>
+  <path d="M40 50 Q48 55 56 50" stroke="#1A1024" stroke-width="5" stroke-linecap="round" fill="none"/>
+</svg>

@@ -176,11 +176,18 @@ export const ARENA = {
   worldSize: 1000,
   /** Kreis-Arena Durchmesser in Welteinheiten. */
   circleDiameter: 900,
-  /** Shotling-Hoehe in Welteinheiten (~90 px bei 390 px Portrait). */
-  shotlingHeight: 230,
+  /**
+   * Shotling-Hoehe in Welteinheiten, abhaengig von der Spielerzahl (ADR-13):
+   * zu zweit ist Platz, zu acht muss jeder trotzdem einzeln lesbar bleiben.
+   */
+  shotlingHeight: { min: 200, max: 250 } as const,
   /** Kopf = 45 % der Koerperhoehe (Chibi-Proportion). */
   headRatio: 0.45,
   maxProps: 4,
+  /** Anteil des Bodenradius, in dem die Maennchen laufen duerfen. */
+  walkRadiusFactor: 0.78,
+  /** Mindestabstand zweier Shotlings als Anteil ihrer Hoehe (etwas mehr als eine Kopfbreite). */
+  separationFactor: 0.66,
   /** Speed-Multiplikatoren je Phase (GDD §5.1). */
   speed: { scan: 1.0, panic: 1.6, lock: 0.4 } as const,
   /** Schritte pro Sekunde bei Speed 1. */
@@ -225,6 +232,16 @@ export const FACE_IDS = [
   'wave',
 ] as const;
 export type FaceId = (typeof FACE_IDS)[number];
+
+/**
+ * Shotling-Hoehe fuer eine Spielerzahl. Zwischen 2 und 8 Spielern linear interpoliert,
+ * damit die Laufzone nie zugestopft wirkt und Duelle trotzdem gross aussehen.
+ */
+export function shotlingHeightFor(playerCount: number): number {
+  const clamped = Math.min(8, Math.max(2, playerCount));
+  const t = (clamped - 2) / 6;
+  return ARENA.shotlingHeight.max + (ARENA.shotlingHeight.min - ARENA.shotlingHeight.max) * t;
+}
 
 /** Hex-Zahl -> CSS-Farbstring. */
 export function hex(value: number): string {

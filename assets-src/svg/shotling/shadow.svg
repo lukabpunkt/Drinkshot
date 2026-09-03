@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Blob-Shadow: weiche Ellipse, im Spiel mit Alpha 0.35. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 48" width="128" height="48">
+  <defs>
+    <radialGradient id="blob">
+      <stop offset="52%" stop-color="#000000" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="64" cy="24" rx="62" ry="22" fill="url(#blob)"/>
+</svg>

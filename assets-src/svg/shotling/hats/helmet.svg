@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "helmet" — Helm mit Kamm. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 16)">
+  <path d="M18 50 C18 24 34 10 56 10 C78 10 94 24 94 50 Z" fill="#2ED573" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M14 50 L98 50" stroke="#1A1024" stroke-width="10" stroke-linecap="round"/>
+  <path d="M56 10 L56 50" stroke="#1A1024" stroke-width="6"/>
+  </g>
+</svg>

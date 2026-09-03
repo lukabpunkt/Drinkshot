@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "crown" — Krone. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 16)">
+  <path d="M22 50 L22 16 L38 30 L56 10 L74 30 L90 16 L90 50 Z" fill="#FFD32A" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="56" cy="40" r="6" fill="#1A1024"/>
+  </g>
+</svg>

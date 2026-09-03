@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "tophat" — Zylinder mit Band. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 12)">
+  <rect x="34" y="8" width="44" height="36" rx="4" fill="#27263D" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="18" y="42" width="76" height="12" rx="6" fill="#27263D" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="34" y="32" width="44" height="10" fill="#FF4757" stroke="none"/>
+  </g>
+</svg>

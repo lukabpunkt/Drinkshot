@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gesicht "x_eyes" — x_eyes: der Standard-Cartoon-Tod. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" width="96" height="64">
+  <path d="M17 17 L37 35 M37 17 L17 35" stroke="#1A1024" stroke-width="7" stroke-linecap="round"/>
+  <path d="M59 17 L79 35 M79 17 L59 35" stroke="#1A1024" stroke-width="7" stroke-linecap="round"/>
+  <ellipse cx="48" cy="51" rx="8" ry="6" fill="#1A1024"/>
+</svg>

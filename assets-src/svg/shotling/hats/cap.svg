@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hut "cap" — Basecap mit Schirm. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 72" width="112" height="72">
+  <g id="hat-base" transform="translate(0 12)">
+  <path d="M20 46 C20 22 36 10 56 10 C76 10 92 22 92 46 Z" fill="#3B82F6" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M92 46 C104 46 108 40 108 34" fill="none" stroke="#1A1024" stroke-width="8" stroke-linecap="round"/>
+  <path d="M88 46 C102 46 106 41 106 35 L92 35 Z" fill="#1E5BB8" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

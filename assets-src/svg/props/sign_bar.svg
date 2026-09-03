@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Requisit "sign_bar" — Schild BAR → — Glas-Piktogramm plus Pfeil, sprachneutral. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 132" width="144" height="132">
+  <path d="M72 126 V70" stroke="#1A1024" stroke-width="14" stroke-linecap="round"/>
+  <path d="M12 14 H112 L136 42 L112 70 H12 Z" fill="#6BCB5C" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M34 26 h28 l-6 18 v12 M42 56 h20 M34 26 v4" fill="none" stroke="#1A1024" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M84 42 h20 m-8 -8 8 8 -8 8" fill="none" stroke="#1A1024" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

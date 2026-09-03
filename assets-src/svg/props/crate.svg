@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Requisit "crate" — Bierkiste (Easter Egg). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 112" width="144" height="112">
+  <rect x="8" y="20" width="128" height="84" rx="8" fill="#C0392B" stroke="#1A1024" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M8 62 H136" stroke="#1A1024" stroke-width="7"/>
+  <path d="M50 20 V104 M94 20 V104" stroke="#1A1024" stroke-width="7"/>
+  <circle cx="29" cy="41" r="7" fill="#FFD32A"/>
+  <circle cx="72" cy="41" r="7" fill="#FFD32A"/>
+  <circle cx="115" cy="41" r="7" fill="#FFD32A"/>
+</svg>

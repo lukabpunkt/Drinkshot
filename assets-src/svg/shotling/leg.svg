@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Bein: Stummel, Pivot oben (Anchor 0.5 / 0.1). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 56" width="32" height="56">
+  <path d="M16 15 V42" stroke="#1A1024" stroke-width="26" stroke-linecap="round" fill="none"/>
+  <path d="M16 15 V42" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <path d="M16 35 V42" stroke="#D2D2D2" stroke-width="13" stroke-linecap="round" fill="none"/>
+</svg>

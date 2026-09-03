@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gesicht "spiral" — spiral: benommen. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" width="96" height="64">
+  <g fill="none" stroke="#1A1024" stroke-width="5" stroke-linecap="round">
+    <path d="M27 26 m0 -12 a12 12 0 1 1 -8.5 3.5 a8 8 0 1 1 8.5 -3.5"/>
+    <path d="M69 26 m0 -12 a12 12 0 1 1 -8.5 3.5 a8 8 0 1 1 8.5 -3.5"/>
+  </g>
+  <path d="M38 50 q5 6 10 0 q5 -6 10 0" stroke="#1A1024" stroke-width="5" stroke-linecap="round" fill="none"/>
+</svg>

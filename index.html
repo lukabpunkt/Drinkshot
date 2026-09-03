@@ -7,10 +7,14 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1"
     />
 
-    <!-- Architektur §10: keine Netzwerk-Calls zur Laufzeit, keine Analytics, keine Cookies. -->
+    <!--
+      Architektur §10: keine Netzwerk-Calls zur Laufzeit, keine Analytics, keine Cookies.
+      `connect-src data:` ist noetig, weil PIXI seine 1x1-Default-Textur als data-URL
+      nachlaedt (faellt nur unter WebKit auf). data-URLs verlassen das Geraet nicht.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
+      content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' data: ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
 
     <title>Drinkshot</title>

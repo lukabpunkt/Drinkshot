@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "straw": {
+      "frame": {
+        "x": 3,
+        "y": 3,
+        "w": 304,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 8,
+        "y": 24,
+        "w": 304,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 224
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "crate": {
+      "frame": {
+        "x": 313,
+        "y": 3,
+        "w": 272,
+        "h": 184
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 8,
+        "y": 32,
+        "w": 272,
+        "h": 184
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 224
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "sign_bar": {
+      "frame": {
+        "x": 591,
+        "y": 3,
+        "w": 264,
+        "h": 244
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 16,
+        "y": 20,
+        "w": 264,
+        "h": 244
+      },
+      "sourceSize": {
+        "w": 288,
+        "h": 264
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "sign_danger": {
+      "frame": {
+        "x": 313,
+        "y": 193,
+        "w": 240,
+        "h": 280
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 8,
+        "y": 8,
+        "w": 240,
+        "h": 280
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 288
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "target": {
+      "frame": {
+        "x": 3,
+        "y": 201,
+        "w": 208,
+        "h": 288
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 16,
+        "y": 8,
+        "w": 208,
+        "h": 288
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 296
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "grass1": {
+      "frame": {
+        "x": 217,
+        "y": 201,
+        "w": 86,
+        "h": 89
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 7,
+        "w": 86,
+        "h": 89
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 96
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "grass2": {
+      "frame": {
+        "x": 217,
+        "y": 296,
+        "w": 54,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 16,
+        "y": 8,
+        "w": 54,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 112,
+        "h": 80
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrel": {
+      "frame": {
+        "x": 861,
+        "y": 3,
+        "w": 194,
+        "h": 257
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 31,
+        "y": 14,
+        "w": 194,
+        "h": 257
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 288
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "cactus": {
+      "frame": {
+        "x": 559,
+        "y": 253,
+        "w": 188,
+        "h": 278
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 18,
+        "y": 42,
+        "w": 188,
+        "h": 278
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 320
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "grass3": {
+      "frame": {
+        "x": 559,
+        "y": 537,
+        "w": 104,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 20,
+        "y": 12,
+        "w": 104,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 144,
+        "h": 88
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "http://github.com/odrick/free-tex-packer-core",
+    "version": "0.3.9",
+    "image": "props@2x.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 1024
+    },
+    "scale": 2
+  }
+}

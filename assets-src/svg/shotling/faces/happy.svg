@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gesicht "happy" — happy: zwei Boegen und ein Grinsen. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" width="96" height="64">
+  <path d="M16 30 Q27 14 38 30" stroke="#1A1024" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <path d="M58 30 Q69 14 80 30" stroke="#1A1024" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <path d="M35 46 Q48 60 61 46" stroke="#1A1024" stroke-width="6" stroke-linecap="round" fill="none"/>
+</svg>

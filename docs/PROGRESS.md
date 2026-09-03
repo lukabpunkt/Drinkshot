@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 Setup & Skelett | ✅ fertig (⏳ 4 manuelle Checks offen) | `v0.0.1` | A0 bestanden |
 | M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
-| M2 Shotlings & Arena | ⬜ offen | – | – |
+| M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
 | M3 Scope, Choreo, Schuss | ⬜ offen | – | – |
 | M4 Todesanimationen | ⬜ offen | – | – |
 | M5 Polish, Modi, A11y | ⬜ offen | – | – |
@@ -138,3 +138,70 @@
 - [ ] Eine echte Runde zu viert auf dem Handy durchspielen (`npm run dev`, Network-URL, oder direkt <https://lukabpunkt.github.io/Drinkshot/>): Fühlt sich das Rumgeben richtig an? Ist die 800-ms-Sperre lang genug — oder zu lang?
 - [ ] Safe-Area auf einem iPhone mit Notch: Steht kein Button hinter der Home-Bar, ist der Sound-Toggle erreichbar?
 - [ ] Screen-Verständlichkeit: Einer unbeteiligten Person nacheinander Lobby, Pass, Bet und Result zeigen und fragen „Was würdest du hier tun?" — Antworten notieren, das ist der wertvollste Input für M5.
+
+## Audit A2 — 2026-09-03
+
+**Ergebnis:** BESTANDEN (alle MUSS-Checks automatisiert grün; 2 Checks brauchen Lukas Gerät)
+
+| Check | Status | Notiz |
+|---|---|---|
+| 8 Shotlings, Referenz-Profil: p50 ≤ 16.7 ms, p95 ≤ 33 ms | ✅ | `perf.spec.ts` misst 10 s bei **CPU-Drossel 4×** (Pixel-5-Profil): **p50 16.7 ms · p95 17.6 ms · 0 Long-Tasks**. Budget aus Architektur §12 (p50 ≤ 20, p95 ≤ 40, ≤ 2 Long-Tasks) deutlich unterschritten. |
+| Draw-Batches in der Arena-Szene ≤ 3 | ✅ | **1 Draw-Call.** Gemessen nicht über eine interne PIXI-Liste, sondern durch Umschließen von `gl.drawElements`/`drawArrays` — das ist die Zahl, die zählt. Der gecachte Boden und beide Atlanten landen dank Multi-Textur-Batching in einem einzigen Aufruf. |
+| Keine Allokationen im Loop: flache Heap-Kurve über 30 s | ✅ | Über CDP mit erzwungenem GC vorher/nachher: **4.64 MB → 4.81 MB, +179 KB in 30 s**. `update()` in Brain und Shotling allokiert nichts; `resolveOverlaps` arbeitet rein auf Zahlen. |
+| Atlas ≤ 2048² je Auflösung, PNG optimiert | ✅ | `shotlings@1x` 1024×512 (55.8 KB) · `shotlings@2x` 2048×1024 (118.6 KB) · `props@1x` 1024×512 (36.4 KB) · `props@2x` 2048×1024 (77.3 KB). Das Build-Skript bricht ab, wenn ein Atlas die Kante reißt. |
+| Look-Check gegen Art Direction §1/§5 | ✅ | `docs/screens/m2-rig.png` zeigt das Rig mit allen 6 Hüten und 6 Gesichtern. Abgehakt: dicke ink-Outlines (3–4 px auf dem Schirm), Chibi-Proportion (Kopf 128 von 276 = **46 %**, Soll 45 %), Cel-Shading in zwei Stufen (ADR-14), Blob-Shadow, keine harten 90°-Ecken. |
+| Alle 8 Farben im Scope-Dunkel unterscheidbar, inkl. Deuteranopie | ✅ | `m2-scope-dark.png` (simulierte Vignette) und `m2-deuteranopia.png` (Brettel/Viénot-Matrix). Ergebnis wie erwartet: **Rot, Grün und Orange fallen bei Deuteranopie zusammen — die Symbole auf dem Torso tragen die Unterscheidung** und sind auch im Dunkeln klar lesbar. Genau dafür stehen sie im GDD §3.1. |
+| Preload während BET: kein sichtbares Nachladen | ✅ | Gemessen: Die Atlanten werden **beim Betreten von PASS** angefordert, 4,2 s bevor die Arena kommt; beim Eintritt ist `is-loading` bereits weg. `loadArenaAssets()` teilt sich eine Promise, doppeltes Laden ist ausgeschlossen. |
+| Low-Effects-Auto-Detect greift bei CPU-Throttle 6× | ⚠️ SOLL, nicht auslösbar | Der Mechanismus ist unit-getestet (Geräte-Schwellen + Frame-Median gegen die 22-ms-Grenze aus §7.9). Er **springt in M2 nicht an, weil die Szene selbst bei 6-facher Drosselung bei 16.7 ms bleibt** — es gibt schlicht noch nichts Teures. Erneut prüfen in A3/A4, sobald Filter, Partikel und Todesanimationen dazukommen. |
+| Walk-Cycle mit Squash & Stretch + Blinzeln, Männchen wirken „lebendig" | ⏳ manuell | Umgesetzt: Bein-Pendel über die **zurückgelegte Strecke** (nicht die Zeit, deshalb passt die Schrittfrequenz automatisch zum Tempo), Arm-Gegenschwung, Torso-Squash zweimal pro Schrittfolge, Kopf-Bounce, Schatten-Puls, Blinzeln alle 2–5 s für 120 ms. Ob es „lebendig" wirkt, ist Lukas Urteil. |
+| Screenshots in `docs/screens/m2-*.png` | ✅ | `m2-rig` (Charakterbogen), `m2-arena` (8 Spieler), `m2-arena-4` (4 Spieler), `m2-scope-dark`, `m2-deuteranopia`, `m2-devpanel`. |
+
+### Definition of Done (Roadmap M2)
+
+| Kriterium | Status | Messwert |
+|---|---|---|
+| 8 Shotlings laufen ohne Frame-Drops, p50 ≤ 16.7 ms | ✅ | p50 16.7 ms bei CPU 4× |
+| Sehen cartoony und lebendig aus | ⏳ manuell | Screenshots liegen bereit |
+| Jede Farbe im Scope-Dunkel unterscheidbar | ✅ | über Symbole, auch bei Deuteranopie |
+| Atlas ≤ 2 Draw-Batches | ✅ | 1 |
+
+### Standing Audit
+
+| Check | Status | Notiz |
+|---|---|---|
+| `npm run typecheck` | ✅ | 0 Fehler |
+| `npm run lint` (Warnings ≤ 5) | ✅ | 0 Fehler, 0 Warnings |
+| `npm run test:unit` | ✅ | **175 passed**, 13 todo |
+| `npm run test:e2e` | ✅ | 24 grün auf iPhone 12 (WebKit) + Pixel 5 |
+| `npm run test:perf` | ✅ | 3 grün |
+| Keine `console.error` im Dev-Flow | ✅ | E2E prüft über zwei volle Runden |
+| Kein hardcodierter UI-Text | ✅ | Grep 0 Treffer |
+| Bundle-Größe | ✅ | 221 KB JS gzip über alle Chunks (Budget 450 KB); WebGPU- und Filter-Code liegen in eigenen Chunks und werden nicht geladen |
+
+### Was M2 geliefert hat
+
+- **Asset-Pipeline:** 30 SVG-Quellen für das Rig (Kopf, Torso, Arm, Bein, Fuß, Schatten, 9 Gesichter, 7 Hüte, 8 Symbole) und 10 Requisiten. `npm run build:atlas` rastert mit `sharp` und packt mit `free-tex-packer-core` zu vier Atlanten (@1x/@2x, PIXI-Format), inklusive Größen-Abbruch.
+- **`ArenaApp`:** ein PIXI-`Application`-Singleton für die ganze Session, 1000 × 1000-Weltkoordinaten mittig in den Host skaliert, `ResizeObserver`, `visibilitychange` stoppt Ticker und GSAP. **Eine Uhr:** der PIXI-Ticker treibt `gsap.updateRoot` (§7.7).
+- **`Arena`:** Bodenkreis mit dunklerem Ring, 14 Grasbüschel und bis zu 4 Requisiten auf dem Ring — alles in einem `cacheAsTexture`-Container, damit der Hintergrund pro Frame eine Textur kostet statt 25 Draw-Aufrufe.
+- **`Shotling`:** 12-teiliges Rig, Tint für die Spielerfarbe, prozeduraler Walk-Cycle, Blinzeln, `setFace`/`setHat`/`lookAt`/`reset`, Zustände `idle|walk|panic|aimed|dead`.
+- **`ShotlingBrain`:** Wander-Steering mit Separation, weichem Rand und Speed-Multiplikator — bewusst **ohne PIXI-Import**, damit die Bewegung ohne Browser testbar ist.
+- **Dev-Panel** (`?dev=1`): fps/p50/p95, echte Draw-Calls, Shotling-Anzahl, Speed, Low-Effects. `&hold=1` hält die Arena offen, damit `perf.spec.ts` über 10 s messen kann.
+
+### Fünf gefundene Fehler
+
+1. **Der @2x-Atlas log über seine eigene Auflösung.** Der Packer schreibt immer `meta.scale: 1`. Auf jedem Retina-Gerät rechnete PIXI die doppelt so großen Texturpixel 1:1 in Welteinheiten um und zeichnete **alles doppelt so groß** — lautlos, ohne Fehlermeldung, und auf einem Nicht-Retina-Rechner unsichtbar. Aufgefallen erst beim Nachrechnen einer Frame-Größe im Atlas-JSON. Behoben in `build-atlas.mjs` (ADR-17).
+2. **PIXI startete gar nicht.** Es baut Shader-Code per `new Function`; unsere CSP verbietet `unsafe-eval`. Statt die CSP aufzuweichen läuft jetzt der eval-freie PIXI-Pfad (ADR-15).
+3. **Zweiter CSP-Verstoß, nur unter WebKit.** PIXI lädt seine 1×1-Default-Textur als `data:`-URL über `fetch` — das brauchte `connect-src data:`. Gefunden hat es der E2E-Test auf dem iPhone-12-Profil; unter Chromium blieb es unsichtbar.
+4. **Die Separation hielt nicht.** Weiche Steering-Kräfte heben sich im Knäuel auf, und ein einzelner Korrektur-Durchgang reicht bei Ketten nicht. Jetzt vier Relaxations-Durchgänge (ADR-16); der Unit-Test misst über 1 000 Schritte den kleinsten Paarabstand.
+5. **Die Perf-Messung log um Faktor zwei.** Die drei Perf-Tests liefen parallel und nahmen sich gegenseitig die CPU weg — p50 stand bei 32.5 ms. Seriell gemessen sind es 16.7 ms. Ein Perf-Test, der parallel zu anderen Perf-Tests läuft, misst nichts.
+
+Dazu ein Handwerksfehler: Die Hüte schwebten über dem Kopf, weil ihre SVGs unten leeren Raum hatten. Behoben, indem jede Hut-Zeichnung auf die Unterkante ihres Rahmens gesetzt wurde.
+
+**Offene SOLL-Follow-ups:**
+- Low-Effects-Auslösung bei CPU-Drossel 6× erneut prüfen, sobald M3/M4 Filter und Partikel bringen.
+- Wipe-Performance im DevTools-Panel gegenmessen (Übertrag aus A1).
+
+**Manuelle Checks, die Luka bestätigen muss, bevor M3 startet:**
+- [ ] **Wirken die Männchen lebendig?** Arena auf dem Handy ansehen (<https://lukabpunkt.github.io/Drinkshot/>, 4 und 8 Spieler). Laufen sie glaubwürdig? Ist das Blinzeln zu hektisch oder zu selten? Ist die Grundgeschwindigkeit richtig?
+- [ ] **Look-Check gegen die Art Direction:** Sind die Outlines dick genug, die Köpfe groß genug, die Farben satt genug? `docs/screens/m2-rig.png` neben `docs/02-ART-DIRECTION.md §5` legen.
+- [ ] Optional, aber hilfreich für M3: Fällt dir eine Farbe schwerer als die anderen, sobald das Scope-Dunkel kommt?

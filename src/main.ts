@@ -15,6 +15,7 @@ import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
 import { createFsm, type GameState, type Transition } from '@/core/fsm';
 import { createSessionStore, resolveRound } from '@/core/session';
+import { preloadArenaAssets } from '@/game/ArenaApp';
 import { confirmSheet } from '@/ui/components/sheet';
 import { showToast } from '@/ui/components/toast';
 import { setHapticsEnabled } from '@/ui/haptics';
@@ -117,6 +118,12 @@ function wipeColor(state: GameState): string {
 }
 
 const BACK_EVENTS = new Set(['cancel', 'changePlayers']);
+
+/**
+ * Preload der Arena-Assets während der Betting-Phase (Architektur §7.12).
+ * Die dauert ohnehin ≥ 10 s — beim Betreten der Arena darf nichts mehr nachladen.
+ */
+fsm.on('PASS', { enter: () => preloadArenaAssets() });
 
 fsm.subscribe(({ to, event }) => {
   void router.go(SCREEN_FOR_STATE[to], {

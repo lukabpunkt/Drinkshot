@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gesicht "scared" — scared: grosse Augen, kleine Pupillen, offener Mund. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" width="96" height="64">
+  <ellipse cx="27" cy="26" rx="15" ry="18" fill="#FFFFFF" stroke="#1A1024" stroke-width="5"/>
+  <ellipse cx="69" cy="26" rx="15" ry="18" fill="#FFFFFF" stroke="#1A1024" stroke-width="5"/>
+  <circle cx="27" cy="28" r="4" fill="#1A1024"/>
+  <circle cx="69" cy="28" r="4" fill="#1A1024"/>
+  <ellipse cx="48" cy="51" rx="9" ry="7" fill="#1A1024"/>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Erdloch fuer leg_spin und butt_rocket. Wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 72" width="160" height="72">
+  <ellipse cx="80" cy="40" rx="70" ry="28" fill="#3A6B33" stroke="#1A1024" stroke-width="8"/>
+  <ellipse cx="80" cy="44" rx="56" ry="20" fill="#1A1024"/>
+  <!-- aufgeworfene Erde am Rand -->
+  <g fill="#4EA544" stroke="#1A1024" stroke-width="6" stroke-linejoin="round">
+    <path d="M16 34 q-8 -14 6 -16 q10 -2 10 10 z"/>
+    <path d="M144 34 q8 -14 -6 -16 q-10 -2 -10 10 z"/>
+    <path d="M80 12 q-10 -12 2 -14 q12 -2 10 12 z"/>
+  </g>
+</svg>

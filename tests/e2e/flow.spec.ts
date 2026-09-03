@@ -50,7 +50,20 @@ async function setUpLobby(page: Page, names: string[]): Promise<void> {
   for (const [index, name] of names.entries()) {
     await inputs.nth(index).fill(name);
     await inputs.nth(index).blur();
+    // Warten, bis der Name wirklich im Feld steht — unter Last kommt das `change`-Event
+    // sonst erst nach der nächsten Interaktion an.
+    await expect(inputs.nth(index)).toHaveValue(name);
   }
+}
+
+/** Liest die gespeicherten Spielernamen aus dem localStorage. */
+async function storedNames(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem('drinkshot.session.v1');
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { players?: { name: string }[] };
+    return (parsed.players ?? []).map((player) => player.name).join(',');
+  });
 }
 
 /** Spielt eine komplette Betting-Phase durch und wartet auf den Result-Screen. */
@@ -168,6 +181,12 @@ test('Namen und Einstellungen überleben einen Reload', async ({ page }) => {
   await page.locator('.sheet__close').click();
   await expect(page.locator('.sheet')).toHaveCount(0);
 
+  /*
+   * Erst neu laden, wenn wirklich geschrieben wurde. Sonst prüft der Test unter Last
+   * gelegentlich einen Reload, der dem letzten Schreibvorgang zuvorgekommen ist — und
+   * meldet einen Persistenzfehler, den es nicht gibt.
+   */
+  await expect.poll(() => storedNames(page)).toContain('Marlene');
   await page.reload();
   await page.getByRole('button', { name: 'Spielen' }).click();
 

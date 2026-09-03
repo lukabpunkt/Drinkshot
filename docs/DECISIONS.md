@@ -90,3 +90,15 @@ Kontext: Die Registry lebt in `game/`, die Runden-Erzeugung in `core/`. Ein Impo
 
 ## ADR-27 · 2026-09-03 · Kontaktbögen statt Video als Animations-Beleg
 Kontext: Audit A4 nennt ein Video aller Tode als SOLL; im System gibt es keinen Encoder (kein `ffmpeg`). Entscheidung: Pro Sequenz ein Kontaktbogen aus acht Frames über die Laufzeit, nebeneinander montiert (`docs/screens/m4a-*.png`), aufgenommen aus der Death-Preview. Konsequenz: Zum Beurteilen sogar besser als ein Video, weil man die Key-Frames direkt vergleichen kann; ein Video bleibt für M6 möglich, wenn ein Encoder da ist.
+
+## ADR-28 · 2026-09-04 · Der zweite Schuss steht einmal in `secondShot()`
+Kontext: Drei Sequenzen (`leg_hop`, `leg_spin`, `miss_then_hit`) feuern mitten in der Animation erneut. Ein Schuss aus dem Nichts wäre nur laut — das Reticle muss dem Opfer vorher sichtbar folgen. Entscheidung: Ein gemeinsamer Baustein in `fx/deathFinish.ts` macht das Nachführen, das kurze Halten, Blitz, Knall und Wackler; die Sequenzen geben nur die Zeiten vor. Konsequenz: Alle drei haben dasselbe Timing, und der Unit-Test prüft für jede, dass Verfolgung und Ankündigung wirklich passieren.
+
+## ADR-29 · 2026-09-04 · Bodenrequisiten hängen nicht am Rig
+Kontext: Das Erdloch aus `leg_spin` und `butt_rocket` war als Rig-Overlay angelegt und drehte sich mit dem Körper mit — beim kopfüber steckenden Männchen landete es über dessen Füssen. Entscheidung: `fx/GroundProp.ts` setzt solche Requisiten unabhängig in die Arena-Ebene, an die Einschlagstelle, mit Label für das Aufräumen. Konsequenz: Overlays bleiben für das, was wirklich am Körper klebt (Skelett, Eis); alles Bodenständige liegt am Boden.
+
+## ADR-30 · 2026-09-04 · Sequenz-Tests leiten ihre Liste aus der Registry ab
+Kontext: Die A4-Kriterien gelten für jede Todesanimation. Eine gepflegte Testliste veraltet genau dann, wenn jemand eine Sequenz hinzufügt und die Eintragung vergisst — also im ungünstigsten Moment. Entscheidung: `deaths.test.ts` liest `allDeaths()` beim Laden und prüft jede gefundene Sequenz gegen alle Kriterien. Konsequenz: `miracle_dodge` ist in M4c automatisch abgedeckt; wer eine Sequenz registriert, bekommt die Prüfung geschenkt.
+
+## ADR-31 · 2026-09-04 · Playwright wartet zehn statt fünf Sekunden
+Kontext: In jedem vollen E2E-Lauf fiel ein anderer Test durch; isoliert liefen alle stabil. Ursache war Ressourcenmangel — ein parallel laufender Dev-Server mit offener Arena. Entscheidung: Die Standard-Wartezeit steht auf 10 s. Konsequenz: Bei einer App, in der fast jede Zusicherung hinter einer Animation hängt (320 ms Wipe, 260 ms Sheet, Arena-Aufbau), sind fünf Sekunden auf einem CI-Runner mit zwei Kernen zu knapp; zehn Sekunden finden echte Hänger immer noch.

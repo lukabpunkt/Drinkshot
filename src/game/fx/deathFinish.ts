@@ -105,6 +105,54 @@ export function clearDeathProps(layer: Container): void {
   }
 }
 
+/**
+ * Der **zweite Schuss** (GDD §4.1).
+ *
+ * Drei Sequenzen leben davon: Beim Bein-Treffer hüpft das Opfer weiter, beim Kreisel
+ * bohrt es sich ein, beim Fehlschuss winkt es erleichtert — und dann fällt der zweite
+ * Schuss. Damit das funktioniert, muss das Reticle dem Opfer **folgen**, bevor es kracht;
+ * ein Schuss aus dem Nichts wäre nur laut, nicht komisch.
+ *
+ * Der Aufbau steht hier einmal, damit alle drei dasselbe Timing haben: nachführen,
+ * kurz halten, Blitz, Knall, Wackler.
+ */
+export interface SecondShotOptions {
+  /** Wie lange das Reticle dem Opfer folgt, bevor es schiesst. */
+  trackMs?: number;
+  /** Wie lange es danach still hält — die Sekunde vor dem Knall. */
+  holdMs?: number;
+}
+
+export function secondShot(
+  ctx: DeathContext,
+  timeline: gsap.core.Timeline,
+  options: SecondShotOptions = {}
+): gsap.core.Timeline {
+  const { victim, scope, camera, audio } = ctx;
+  const trackMs = options.trackMs ?? 900;
+  const holdMs = options.holdMs ?? 260;
+
+  // Das Reticle nimmt die Verfolgung auf — sichtbar, sonst überrascht der Schuss falsch.
+  timeline.call(() => {
+    scope.aimAt(victim.aimPoint, trackMs, 'smooth');
+    audio.play('reticle_move');
+    audio.play('lock_tick', trackMs / 1000);
+  });
+  timeline.to({}, { duration: trackMs / 1000 });
+
+  // Kurz halten: „jetzt aber wirklich".
+  timeline.call(() => audio.play('lock_engage'));
+  timeline.to({}, { duration: holdMs / 1000 });
+
+  timeline.call(() => {
+    audio.play('gunshot');
+    scope.flash();
+    camera.shakeScreen();
+  });
+
+  return timeline;
+}
+
 /** Hit-Stop plus Squash beim Treffer — der Auftakt fast jeder Sequenz. */
 export function impactBeat(
   timeline: gsap.core.Timeline,

@@ -100,32 +100,40 @@ function runToEnd(timeline: gsap.core.Timeline): void {
   timeline.progress(1, false);
 }
 
+/*
+ * Die Liste kommt aus der Registry, nicht aus einer gepflegten Aufzählung: Jede neue
+ * Sequenz wird damit automatisch gegen alle A4-Kriterien geprüft, ohne dass jemand daran
+ * denken muss.
+ */
+registerAllDeaths();
+const REGISTERED = allDeaths().map((sequence) => sequence.id);
+
 beforeEach(() => {
   clearDeathRegistry();
   resetDeathRegistration();
   registerAllDeaths();
 });
 
-describe('Registry nach M4a', () => {
-  it('enthält die sechs Sequenzen aus Kopf und Brust', () => {
-    const ids = allDeaths().map((sequence) => sequence.id).sort();
-    expect(ids).toEqual(
-      [
-        'basic_fall',
-        'body_deflate',
-        'body_dramatic',
-        'body_freeze_shatter',
-        'head_hat_launch',
-        'head_helmet_spin',
-        'head_xray',
-      ].sort()
-    );
+describe('Registry', () => {
+  it('registriert jede Sequenz genau einmal', () => {
+    const ids = allDeaths().map((sequence) => sequence.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBeGreaterThanOrEqual(11);
   });
 
-  it('deckt die Zonen Kopf und Brust ab', () => {
+  it('deckt die Zonen Kopf, Brust, Bein, Po und Miss ab', () => {
     const zones = new Set(allDeaths().map((sequence) => sequence.zone));
-    expect(zones.has('head')).toBe(true);
-    expect(zones.has('body')).toBe(true);
+    for (const zone of ['head', 'body', 'leg', 'butt', 'miss'] as const) {
+      expect(zones, `Zone ${zone} fehlt`).toContain(zone);
+    }
+  });
+
+  it('markiert die Zweiter-Schuss-Sequenzen (Audit A4)', () => {
+    const twoShots = allDeaths()
+      .filter((sequence) => sequence.needsSecondShot)
+      .map((sequence) => sequence.id)
+      .sort();
+    expect(twoShots).toEqual(['leg_hop', 'leg_spin', 'miss_then_hit']);
   });
 
   it('head_hat_launch wählt sich ohne Hut ab', () => {
@@ -138,17 +146,7 @@ describe('Registry nach M4a', () => {
   });
 });
 
-describe.each(
-  [
-    'head_helmet_spin',
-    'head_hat_launch',
-    'head_xray',
-    'body_dramatic',
-    'body_deflate',
-    'body_freeze_shatter',
-    'basic_fall',
-  ].map((id) => [id] as const)
-)('%s', (id) => {
+describe.each(REGISTERED.map((id) => [id] as const))('%s', (id) => {
   function sequenceOf(): DeathSequence {
     const found = allDeaths().find((entry) => entry.id === id);
     expect(found, `Sequenz ${id} ist nicht registriert`).toBeDefined();
@@ -243,6 +241,29 @@ describe.each(
       .map((child) => String((child.vars as { ease?: unknown }).ease ?? ''));
     const hasCharacter = eases.some((ease) => /back|elastic|bounce|power[234]/.test(ease));
     expect(hasCharacter, `${id} animiert nur mit Rampen: ${eases.join(', ')}`).toBe(true);
+  });
+});
+
+describe('Zweiter Schuss', () => {
+  /*
+   * Bei `leg_hop`, `leg_spin` und `miss_then_hit` fällt ein zweiter Schuss. Er muss
+   * angekündigt sein — das Reticle nimmt sichtbar die Verfolgung auf —, sonst ist der
+   * Knall nur laut statt komisch (GDD §4.1).
+   */
+  it.each(['leg_hop', 'leg_spin', 'miss_then_hit'])('%s führt das Reticle nach und schiesst erneut', (id) => {
+    const harness = makeHarness();
+    const aims: number[] = [];
+    (harness.ctx.scope as unknown as { aimAt: () => unknown }).aimAt = () => {
+      aims.push(1);
+      return gsap.timeline();
+    };
+
+    const sequence = allDeaths().find((entry) => entry.id === id)!;
+    runToEnd(sequence.build(harness.ctx));
+
+    expect(aims.length, `${id} führt das Reticle nicht nach`).toBeGreaterThan(0);
+    expect(harness.cues, `${id} feuert keinen zweiten Schuss`).toContain('gunshot');
+    expect(harness.cues, `${id} kündigt den Schuss nicht an`).toContain('lock_engage');
   });
 });
 

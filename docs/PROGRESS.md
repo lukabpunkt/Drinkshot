@@ -6,7 +6,7 @@
 | M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
 | M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
 | M3 Scope, Choreo, Schuss | ✅ fertig (⏳ 3 manuelle Checks offen) | `v0.3.0` | A3 bestanden |
-| M4 Todesanimationen | 🟡 M4a fertig (6 von 12) | – | Zwischenbericht |
+| M4 Todesanimationen | 🟡 M4a + M4b fertig (11 von 12) | – | Zwischenbericht |
 | M5 Polish, Modi, A11y | ⬜ offen | – | – |
 | M6 Playtest & Release | ⬜ offen | – | – |
 
@@ -369,3 +369,96 @@ nebeneinander. Besser als ein Video, weil man die Key-Frames vergleichen kann.
       Dropdown links unten). Welche funktioniert, welche nicht?
 - [ ] Ist `body_dramatic` mit dem doppelten Aufstehen zu lang oder genau richtig?
 - [ ] Liest sich `head_helmet_spin` als Schraube — oder muss der Kopf noch tiefer rein?
+
+## Zwischenbericht M4b — 2026-09-04
+
+**Bein, Po und Miss sind fertig** — damit stehen elf der zwölf Sequenzen aus GDD §4.1.
+Nur `miracle_dodge` fehlt (M4c), zusammen mit der Feier auf dem Result-Screen.
+
+Neu in dieser Etappe ist der **zweite Schuss**: Bei drei Sequenzen fällt ein weiterer
+Schuss mitten in der Animation. Das ist mehr als ein zusätzlicher Knall — das Reticle muss
+dem Opfer sichtbar folgen, sonst ist der Schuss nur laut statt komisch. Der Aufbau steht
+einmal in `secondShot()`, damit alle drei dasselbe Timing haben: nachführen, kurz halten,
+Blitz, Knall, Wackler.
+
+### Die fünf neuen Sequenzen gegen die A4-Kriterien
+
+| Sequenz | Zone | Dauer | 2. Schuss | Anticipation | Hit-Stop | Squash | Cues | Abschluss |
+|---|---|---|---|---|---|---|---|---|
+| `leg_hop` | Bein | 4,39 s | ✅ | Bein zieht sich an | 80 ms | ✅ pro Hüpfer | 9 | ✅ |
+| `leg_spin` | Bein | 3,34 s | ✅ | Kreisel beschleunigt | 80 ms | ✅ | 8 | ✅ |
+| `butt_rocket` | Po | 3,74 s | – | sackt vor dem Start ab | 80 ms | ✅ | 6 | ✅ |
+| `butt_hotfoot` | Po | 2,89 s | – | Sprung vor dem Rennen | 80 ms | ✅ | 5 | ✅ |
+| `miss_then_hit` | Miss | 4,15 s | ✅ | zuckt weg, dann Erleichterung | 80 ms | ✅ | 10 | ✅ |
+
+### Alle elf im Überblick
+
+| Zone | Sequenzen | Dauern |
+|---|---|---|
+| Kopf | `head_helmet_spin`, `head_hat_launch`, `head_xray` | 3,22 / 4,42 / 1,71 s |
+| Brust | `body_dramatic`, `body_deflate`, `body_freeze_shatter` (+ `basic_fall`) | 3,74 / 2,78 / 2,71 (+ 1,81) s |
+| Bein | `leg_hop`, `leg_spin` | 4,39 / 3,34 s |
+| Po | `butt_rocket`, `butt_hotfoot` | 3,74 / 2,89 s |
+| Miss | `miss_then_hit` | 4,15 s |
+| Miracle | — | M4c |
+
+Alle zwölf registrierten Sequenzen liegen zwischen 1,71 s und 4,42 s; die Grenze aus
+Architektur §6 ist 4,5 s. Der No-Repeat-Filter greift jetzt tatsächlich, weil mit zwölf
+Einträgen die Mindest-Poolgrösse von acht überschritten ist.
+
+### Was die Tests jetzt abdecken
+
+Die Sequenz-Tests holen ihre Liste **aus der Registry**, nicht aus einer gepflegten
+Aufzählung. Jede neue Sequenz wird damit automatisch gegen alle A4-Kriterien geprüft —
+Dauer, Endzustand, sauberer Reset inklusive Skalierung, Sound-Cues, Overshoot-Easing,
+Hit-Stop und der gemeinsame Abschluss. In M4c muss niemand daran denken, `miracle_dodge`
+in eine Testliste einzutragen.
+
+Dazu drei neue Zusicherungen speziell für den zweiten Schuss: Er fällt nur bei `leg_hop`,
+`leg_spin` und `miss_then_hit`, das Reticle nimmt vorher sichtbar die Verfolgung auf, und
+der Schuss wird angekündigt (`lock_engage`), bevor er kracht.
+
+| Check | Wert |
+|---|---|
+| Unit-Tests | **334** grün (104 für die Sequenzen) |
+| E2E | 34 grün auf iPhone 12 (WebKit) + Pixel 5 |
+| Perf mit 12 Sequenzen | **0 Long-Tasks**, p50 16,7 ms · p95 17,6 ms bei CPU 4× |
+| JS-Zeit pro Frame | p95 0,70 ms (Budget 4 ms) |
+| Draw-Calls | 5, unverändert |
+| Heap über 30 s | +622 KB |
+
+### Zwei gefundene Fehler
+
+1. **`miss_then_hit` liess das Opfer am Leben.** Die Sequenz setzte den Zustand nie auf
+   `dead` — nach der Runde wäre das Männchen weitergelaufen, während der Result-Screen
+   verkündet, dass es getroffen wurde. Der Fehler war naheliegend, weil das Opfer hier
+   absichtlich erst **spät** stirbt: Es überlebt den ersten Schuss, winkt erleichtert, und
+   erst der zweite trifft. Genau an dieser Stelle fehlte die Zeile.
+2. **Das Erdloch klebte am Körper statt am Boden.** Bei `leg_spin` und `butt_rocket` war es
+   als Rig-Overlay angelegt und drehte und verschob sich deshalb mit — bei dem kopfüber im
+   Boden steckenden Männchen landete es über dessen Füssen. Bodenrequisiten haben jetzt
+   ein eigenes Modul (`fx/GroundProp.ts`) und liegen dort, wo eingeschlagen wurde.
+
+### Eine Lehre über die Testumgebung
+
+Während dieser Etappe fiel in jedem vollen E2E-Lauf ein **anderer** Test durch — mal die
+Persistenz, mal der Zurück-Button, mal die Stumm-Prüfung. Isoliert liefen alle grün, und
+zwar stabil auf die Zehntelsekunde. Die Ursache war kein Testfehler: Parallel lief ein
+Dev-Server mit offener Arena, die durchgehend mit 60 fps rendert und den Tests die CPU
+wegnahm. Sobald der Tab auf dem Titelbildschirm parkte, waren alle 34 grün.
+
+Zwei Dinge bleiben als Konsequenz: Die Standard-Wartezeit von Playwright steht jetzt auf
+10 s statt 5 s — bei einer App, in der fast jede Zusicherung hinter einer Animation hängt,
+sind fünf Sekunden auf einem ausgelasteten Rechner oder einem CI-Runner mit zwei Kernen zu
+knapp. Und der Persistenz-Test wartet jetzt darauf, dass wirklich geschrieben wurde, statt
+darauf zu hoffen.
+
+**Zum Anschauen:** `docs/screens/m4b-*.png`, acht Frames pro Sequenz. In `leg_hop` und
+`miss_then_hit` erwischt der Kontaktbogen den Mündungsblitz des zweiten Schusses als
+weisses Bild — der Beweis, dass er im richtigen Moment fällt.
+
+**Was Luka beurteilen muss:**
+- [ ] `leg_hop`: Ist die Verfolgung durch das Reticle lang genug, dass man mitleidet — oder
+      schon zu lang?
+- [ ] `miss_then_hit`: Kommt der zweite Schuss früh genug, dass die Hand noch oben ist?
+- [ ] `butt_rocket`: Trägt die leere Sekunde, oder wirkt sie wie ein Hänger?

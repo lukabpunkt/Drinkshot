@@ -16,6 +16,14 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  /*
+   * Playwrights Standard von 5 s geht von statischen Seiten aus. Hier hängt fast jede
+   * Zusicherung hinter einer Animation: 320 ms Wipe, 260 ms Sheet, dazu das Aufbauen der
+   * Arena. Auf einem ausgelasteten Rechner — CI-Runner mit zwei Kernen oder ein parallel
+   * laufender Dev-Server — reicht das nicht, und man repariert dann Tests, die in Ordnung
+   * sind. Zehn Sekunden sind immer noch kurz genug, um echte Hänger zu finden.
+   */
+  expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: 'http://localhost:4173/Drinkshot/',

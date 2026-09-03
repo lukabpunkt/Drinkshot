@@ -15,7 +15,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  /*
+   * Zwei Versuche in der CI. Die Runner haben zwei Kerne und keine GPU; eine Runde dauert
+   * dort mit WebKit über eine Minute, und einzelne zeitbasierte Zusicherungen kippen
+   * gelegentlich. Lokal bleibt es bei null Versuchen — dort ist ein roter Test echt.
+   */
+  retries: process.env.CI ? 2 : 0,
   /*
    * Playwrights Standard von 5 s geht von statischen Seiten aus. Hier hängt fast jede
    * Zusicherung hinter einer Animation: 320 ms Wipe, 260 ms Sheet, dazu das Aufbauen der

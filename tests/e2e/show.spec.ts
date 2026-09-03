@@ -9,11 +9,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /*
- * Reihenfolge ist hier Teil der Aussage: Diese Tests messen echte Wartezeiten einer
- * 10–22 s langen Show. Der Runner läuft ohnehin mit einem Worker (playwright.config.ts),
- * `serial` hält es auch dann, wenn jemand die Konfiguration ändert.
+ * Diese Tests messen echte Wartezeiten einer 10–22 s langen Show. Die Reihenfolge ist
+ * durch `workers: 1` und `fullyParallel: false` ohnehin sequenziell (playwright.config.ts).
+ *
+ * Bewusst **kein** `mode: 'serial'`: Der bricht nach dem ersten Fehler den Rest der Datei
+ * ab. Bei einem Flake auf einem langsamen Runner verliert man dadurch das Ergebnis aller
+ * folgenden Tests — und weiss hinterher weniger als vorher.
  */
-test.describe.configure({ mode: 'serial' });
 
 const PLAYERS = 4;
 

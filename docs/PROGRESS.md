@@ -3,7 +3,7 @@
 | Meilenstein | Status | Tag | Audit |
 |---|---|---|---|
 | M0 Setup & Skelett | ✅ fertig (⏳ 4 manuelle Checks offen) | `v0.0.1` | A0 bestanden |
-| M1 UI-Flow | ⬜ offen | – | – |
+| M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
 | M2 Shotlings & Arena | ⬜ offen | – | – |
 | M3 Scope, Choreo, Schuss | ⬜ offen | – | – |
 | M4 Todesanimationen | ⬜ offen | – | – |

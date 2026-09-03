@@ -1,18 +1,23 @@
 /**
- * Session-Tests (Architektur §4).
- * M0 deckt Runden-Erzeugung und Persistenz ab; die Modus-Logik folgt in M1.
+ * Session-Tests (Architektur §4, Audit A1: "Alle 4 Modi liefern korrekte Drinker").
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MAX_ROUND_HISTORY, STORAGE_KEY } from '@/config/rules';
+import { MAX_PLAYERS, MAX_ROUND_HISTORY, STORAGE_KEY } from '@/config/rules';
 import type { Bet } from '@/core/lottery';
 import {
+  activePlayers,
   createEmptySession,
   createRoundSetup,
+  createSessionStore,
+  eliminatedPlayerIds,
   loadSession,
+  resolveRound,
   roundOdds,
   saveSession,
+  scoreboard,
   type RoundResult,
+  type RoundSetup,
 } from '@/core/session';
 
 const BETS: Bet[] = [
@@ -21,34 +26,185 @@ const BETS: Bet[] = [
   { playerId: 'p3', sips: 5 },
 ];
 
+/** Baut ein RoundSetup ohne Ziehung — das Opfer wird fuer den Test vorgegeben. */
+function setup(overrides: Partial<RoundSetup> = {}): RoundSetup {
+  return {
+    seed: 1,
+    bets: BETS.map((bet) => ({ ...bet })),
+    victimId: 'p3',
+    extraVictimIds: [],
+    deathId: 'basic_fall',
+    zone: 'body',
+    mode: 'classic',
+    durationPreset: 'normal',
+    ...overrides,
+  };
+}
+
 beforeEach(() => localStorage.clear());
 
 describe('createRoundSetup', () => {
   it('zieht ein Opfer aus der Runde und setzt einen Seed', () => {
-    const setup = createRoundSetup(BETS, 'classic', 'normal');
-    expect(['p1', 'p2', 'p3']).toContain(setup.victimId);
-    expect(setup.extraVictimIds).toEqual([]);
-    expect(Number.isInteger(setup.seed)).toBe(true);
-    expect(setup.mode).toBe('classic');
-    expect(setup.durationPreset).toBe('normal');
-    expect(setup.deathId).toBe('basic_fall');
+    const result = createRoundSetup(BETS, 'classic', 'normal');
+    expect(['p1', 'p2', 'p3']).toContain(result.victimId);
+    expect(result.extraVictimIds).toEqual([]);
+    expect(Number.isInteger(result.seed)).toBe(true);
+    expect(result.deathId).toBe('basic_fall');
+    expect(result.zone).toBe('body');
   });
 
   it('kopiert die Einsaetze, statt sie zu referenzieren', () => {
-    const setup = createRoundSetup(BETS, 'classic', 'normal');
-    setup.bets[0]!.sips = 99;
+    const result = createRoundSetup(BETS, 'classic', 'normal');
+    result.bets[0]!.sips = 99;
     expect(BETS[0]!.sips).toBe(2);
   });
 
   it('zieht im Modus "Double Tap" zwei verschiedene Opfer', () => {
-    const setup = createRoundSetup(BETS, 'doubleTap', 'long');
-    expect(setup.extraVictimIds).toHaveLength(1);
-    expect(setup.extraVictimIds[0]).not.toBe(setup.victimId);
+    const result = createRoundSetup(BETS, 'doubleTap', 'long');
+    expect(result.extraVictimIds).toHaveLength(1);
+    expect(result.extraVictimIds[0]).not.toBe(result.victimId);
   });
 
   it('roundOdds liefert die Chancen-Tabelle', () => {
-    const odds = roundOdds(createRoundSetup(BETS, 'classic', 'normal'));
-    expect(odds['p3']).toBeCloseTo(0.5, 10);
+    expect(roundOdds(createRoundSetup(BETS, 'classic', 'normal'))['p3']).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe('resolveRound — Modus "Klassik"', () => {
+  it('das Opfer trinkt seinen eigenen Einsatz', () => {
+    const result = resolveRound(setup());
+    expect(result.drinkers).toEqual([{ playerId: 'p3', sips: 5 }]);
+    expect(result.eliminatedIds).toEqual([]);
+  });
+
+  it('haengt Chancen und Zeitstempel an', () => {
+    const result = resolveRound(setup(), 1_700_000_000_000);
+    expect(result.odds['p3']).toBeCloseTo(0.5, 10);
+    expect(result.finishedAt).toBe(1_700_000_000_000);
+  });
+
+  it('greift auch beim kleinsten Einsatz', () => {
+    expect(resolveRound(setup({ victimId: 'p1' })).drinkers).toEqual([{ playerId: 'p1', sips: 2 }]);
+  });
+});
+
+describe('resolveRound — Modus "Verteiler"', () => {
+  it('alle ausser dem Opfer trinken dessen Einsatz', () => {
+    const result = resolveRound(setup({ mode: 'distributor' }));
+    expect(result.drinkers).toEqual([
+      { playerId: 'p1', sips: 5 },
+      { playerId: 'p2', sips: 5 },
+    ]);
+    expect(result.drinkers.some((drinker) => drinker.playerId === 'p3')).toBe(false);
+  });
+
+  it('bei 2 Spielern trinkt genau einer', () => {
+    const result = resolveRound(
+      setup({
+        mode: 'distributor',
+        bets: [
+          { playerId: 'a', sips: 4 },
+          { playerId: 'b', sips: 7 },
+        ],
+        victimId: 'b',
+      })
+    );
+    expect(result.drinkers).toEqual([{ playerId: 'a', sips: 7 }]);
+  });
+});
+
+describe('resolveRound — Modus "Sudden Death"', () => {
+  it('das Opfer trinkt und scheidet aus', () => {
+    const result = resolveRound(setup({ mode: 'suddenDeath' }));
+    expect(result.drinkers).toEqual([{ playerId: 'p3', sips: 5 }]);
+    expect(result.eliminatedIds).toEqual(['p3']);
+    expect(result.winnerId).toBeUndefined();
+  });
+
+  it('kuert den letzten Ueberlebenden und beziffert, was er verteilt', () => {
+    const result = resolveRound(
+      setup({
+        mode: 'suddenDeath',
+        bets: [
+          { playerId: 'a', sips: 4 },
+          { playerId: 'b', sips: 6 },
+        ],
+        victimId: 'b',
+      })
+    );
+    expect(result.eliminatedIds).toEqual(['b']);
+    expect(result.winnerId).toBe('a');
+    expect(result.sipsToDistribute).toBe(10);
+  });
+});
+
+describe('resolveRound — Modus "Double Tap"', () => {
+  it('beide Opfer trinken ihren eigenen Einsatz', () => {
+    const result = resolveRound(setup({ mode: 'doubleTap', victimId: 'p3', extraVictimIds: ['p1'] }));
+    expect(result.drinkers).toEqual([
+      { playerId: 'p3', sips: 5 },
+      { playerId: 'p1', sips: 2 },
+    ]);
+  });
+
+  it('ohne zweites Opfer verhaelt es sich wie Klassik', () => {
+    const result = resolveRound(setup({ mode: 'doubleTap' }));
+    expect(result.drinkers).toEqual([{ playerId: 'p3', sips: 5 }]);
+  });
+});
+
+describe('resolveRound — Miracle (GDD §4.1)', () => {
+  it('niemand trinkt', () => {
+    const result = resolveRound(setup({ zone: 'miracle', deathId: 'miracle_dodge' }));
+    expect(result.drinkers).toEqual([]);
+    expect(result.eliminatedIds).toEqual([]);
+  });
+
+  it('im Verteiler-Modus trinken alle genau 1', () => {
+    const result = resolveRound(setup({ zone: 'miracle', mode: 'distributor' }));
+    expect(result.drinkers).toEqual([
+      { playerId: 'p1', sips: 1 },
+      { playerId: 'p2', sips: 1 },
+      { playerId: 'p3', sips: 1 },
+    ]);
+  });
+
+  it('scheidet auch in Sudden Death niemanden aus', () => {
+    expect(resolveRound(setup({ zone: 'miracle', mode: 'suddenDeath' })).eliminatedIds).toEqual([]);
+  });
+});
+
+describe('Scoreboard & Ausscheiden', () => {
+  it('summiert ueber alle Runden', () => {
+    const session = createEmptySession();
+    session.players = [
+      { id: 'p1', name: 'A', colorId: 'red' },
+      { id: 'p2', name: 'B', colorId: 'blue' },
+    ];
+    session.rounds = [
+      resolveRound(setup({ bets: [{ playerId: 'p1', sips: 3 }], victimId: 'p1' })),
+      resolveRound(setup({ bets: [{ playerId: 'p1', sips: 2 }], victimId: 'p1' })),
+      resolveRound(setup({ bets: [{ playerId: 'p2', sips: 7 }], victimId: 'p2' })),
+    ];
+    expect(scoreboard(session)).toEqual({ p1: 5, p2: 7 });
+  });
+
+  it('startet jeden Spieler bei 0', () => {
+    const session = createEmptySession();
+    session.players = [{ id: 'p1', name: 'A', colorId: 'red' }];
+    expect(scoreboard(session)).toEqual({ p1: 0 });
+  });
+
+  it('leitet Ausgeschiedene aus der History ab', () => {
+    const session = createEmptySession();
+    session.players = [
+      { id: 'p1', name: 'A', colorId: 'red' },
+      { id: 'p2', name: 'B', colorId: 'blue' },
+      { id: 'p3', name: 'C', colorId: 'green' },
+    ];
+    session.rounds = [resolveRound(setup({ mode: 'suddenDeath', victimId: 'p2' }))];
+    expect([...eliminatedPlayerIds(session)]).toEqual(['p2']);
+    expect(activePlayers(session).map((player) => player.id)).toEqual(['p1', 'p3']);
   });
 });
 
@@ -56,7 +212,6 @@ describe('Persistenz', () => {
   it('liefert ohne gespeicherte Daten eine leere Session', () => {
     const session = loadSession();
     expect(session.players).toEqual([]);
-    expect(session.rounds).toEqual([]);
     expect(session.settings.mode).toBe('classic');
   });
 
@@ -78,20 +233,143 @@ describe('Persistenz', () => {
     expect(loadSession().rounds).toHaveLength(MAX_ROUND_HISTORY);
   });
 
-  it('ueberlebt kaputte Daten im localStorage', () => {
+  it('ueberlebt kaputte Daten und muellige Spieler-Eintraege', () => {
     localStorage.setItem(STORAGE_KEY, '{kein json');
     expect(loadSession().players).toEqual([]);
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        players: [
+          { id: 'ok', name: 'Gut', colorId: 'red' },
+          { id: 'x', name: 'Kaputt', colorId: 'magenta' },
+          { name: 'ohne id', colorId: 'blue' },
+          null,
+          'nope',
+        ],
+      })
+    );
+    expect(loadSession().players).toEqual([{ id: 'ok', name: 'Gut', colorId: 'red' }]);
   });
 
-  it('ueberlebt fehlende Felder', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: 'nope' }));
-    const loaded = loadSession();
-    expect(loaded.players).toEqual([]);
-    expect(loaded.rounds).toEqual([]);
+  it('kuerzt zu lange Namen beim Laden', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ players: [{ id: 'a', name: 'Viel zu langer Name', colorId: 'red' }] })
+    );
+    expect(loadSession().players[0]!.name).toHaveLength(12);
   });
 
   it('funktioniert ohne Storage (privater Modus)', () => {
     expect(() => saveSession(createEmptySession(), undefined)).not.toThrow();
     expect(loadSession(undefined).players).toEqual([]);
+  });
+});
+
+describe('SessionStore', () => {
+  const nameFor = (index: number): string => `Spieler ${index}`;
+
+  it('vergibt Farben der Reihe nach', () => {
+    const store = createSessionStore(createEmptySession());
+    store.addPlayer(nameFor);
+    store.addPlayer(nameFor);
+    store.addPlayer(nameFor);
+    expect(store.state.players.map((player) => player.colorId)).toEqual(['red', 'blue', 'green']);
+  });
+
+  it('vergibt eine frei gewordene Farbe erneut', () => {
+    const store = createSessionStore(createEmptySession());
+    store.addPlayer(nameFor);
+    const second = store.addPlayer(nameFor)!;
+    store.addPlayer(nameFor);
+    store.removePlayer(second.id);
+    expect(store.addPlayer(nameFor)!.colorId).toBe('blue');
+  });
+
+  it('stoppt bei 8 Spielern', () => {
+    const store = createSessionStore(createEmptySession());
+    for (let i = 0; i < MAX_PLAYERS; i++) expect(store.addPlayer(nameFor)).not.toBeNull();
+    expect(store.addPlayer(nameFor)).toBeNull();
+    expect(store.state.players).toHaveLength(MAX_PLAYERS);
+  });
+
+  it('fuellt auf die Mindestzahl auf', () => {
+    const store = createSessionStore(createEmptySession());
+    store.ensureMinimumPlayers(nameFor);
+    expect(store.state.players).toHaveLength(2);
+    store.ensureMinimumPlayers(nameFor);
+    expect(store.state.players).toHaveLength(2);
+  });
+
+  it('benennt um und kuerzt auf 12 Zeichen', () => {
+    const store = createSessionStore(createEmptySession());
+    const player = store.addPlayer(nameFor)!;
+    store.renamePlayer(player.id, 'Ein sehr langer Name');
+    expect(store.state.players[0]!.name).toBe('Ein sehr lan');
+  });
+
+  it('persistiert jede Aenderung', () => {
+    const store = createSessionStore(createEmptySession());
+    store.addPlayer(nameFor);
+    expect(loadSession().players).toHaveLength(1);
+  });
+
+  it('meldet canStart erst ab zwei aktiven Spielern', () => {
+    const store = createSessionStore(createEmptySession());
+    store.addPlayer(nameFor);
+    expect(store.canStart()).toBe(false);
+    store.addPlayer(nameFor);
+    expect(store.canStart()).toBe(true);
+  });
+
+  it('schliesst Ausgeschiedene von activePlayers aus', () => {
+    const store = createSessionStore(createEmptySession());
+    const a = store.addPlayer(nameFor)!;
+    const b = store.addPlayer(nameFor)!;
+    store.recordRound(
+      resolveRound(
+        setup({
+          mode: 'suddenDeath',
+          bets: [
+            { playerId: a.id, sips: 1 },
+            { playerId: b.id, sips: 2 },
+          ],
+          victimId: b.id,
+        })
+      )
+    );
+    expect(store.activePlayers().map((player) => player.id)).toEqual([a.id]);
+    expect(store.canStart()).toBe(false);
+  });
+
+  it('benachrichtigt Subscriber', () => {
+    const store = createSessionStore(createEmptySession());
+    let calls = 0;
+    const off = store.subscribe(() => calls++);
+    store.addPlayer(nameFor);
+    expect(calls).toBe(1);
+    off();
+    store.addPlayer(nameFor);
+    expect(calls).toBe(1);
+  });
+
+  it('resetRounds behaelt Spieler, reset raeumt alles ab', () => {
+    const store = createSessionStore(createEmptySession());
+    store.addPlayer(nameFor);
+    store.recordRound(resolveRound(setup()));
+    store.resetRounds();
+    expect(store.state.rounds).toEqual([]);
+    expect(store.state.players).toHaveLength(1);
+
+    store.reset();
+    expect(store.state.players).toEqual([]);
+    expect(loadSession().players).toEqual([]);
+  });
+
+  it('findet Spieler ueber die ID', () => {
+    const store = createSessionStore(createEmptySession());
+    const player = store.addPlayer(nameFor)!;
+    expect(store.playerById(player.id)?.id).toBe(player.id);
+    expect(store.playerById('gibt-es-nicht')).toBeUndefined();
   });
 });

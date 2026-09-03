@@ -1,47 +1,183 @@
 /**
  * Bootstrap.
  *
- * M0: Tokens/Styles laden, i18n initialisieren, Store und FSM aufsetzen (nur Logging,
- * noch keine Screens), Boot-Screen mit dem Titel rendern, Service Worker registrieren.
- *
- * TODO(M1): Router einhaengen (`ui/router.ts`), Audio-Unlock beim ersten Tap,
- *           Screens an die FSM-Hooks binden.
+ * Verdrahtet Session-Store, FSM und Router. Die FSM entscheidet, der Router zeigt an —
+ * Screens senden nur Events und lesen den Zustand. Die Ziehung passiert ausschliesslich
+ * in der FSM beim letzten `confirm` (ADR-2); dieser Bootstrap fasst sie nicht an.
  */
 
 import '@/styles/tokens.css';
 import '@/styles/base.css';
 import '@/styles/components.css';
 
-import { DEFAULT_SETTINGS } from '@/config/rules';
+import { setAudioEnabled } from '@/audio/AudioManager';
+import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
-import { createFsm, type Transition } from '@/core/fsm';
-import { createStore } from '@/core/store';
-import { loadSession, type Session } from '@/core/session';
-
-/* ------------------------------------------------------------------ */
-/* App-Store                                                           */
-/* ------------------------------------------------------------------ */
-
-interface AppState {
-  session: Session;
-  /** Dev-Panel via `?dev=1` (Architektur §9). */
-  dev: boolean;
-}
+import { createFsm, type GameState, type Transition } from '@/core/fsm';
+import { createSessionStore, resolveRound } from '@/core/session';
+import { confirmSheet } from '@/ui/components/sheet';
+import { showToast } from '@/ui/components/toast';
+import { setHapticsEnabled } from '@/ui/haptics';
+import { createRouter, type ScreenId } from '@/ui/router';
+import { createArenaScreen } from '@/ui/screens/ArenaScreen';
+import { createBetScreen } from '@/ui/screens/BetScreen';
+import { createLobbyScreen } from '@/ui/screens/LobbyScreen';
+import { createPassScreen } from '@/ui/screens/PassScreen';
+import { createResultScreen } from '@/ui/screens/ResultScreen';
+import { createTitleScreen } from '@/ui/screens/TitleScreen';
 
 const params = new URLSearchParams(globalThis.location?.search ?? '');
+const dev = params.get('dev') === '1';
 
-const session = loadSession();
-export const store = createStore<AppState>({
-  session,
-  dev: params.get('dev') === '1',
+/* ------------------------------------------------------------------ */
+/* Session                                                             */
+/* ------------------------------------------------------------------ */
+
+const session = createSessionStore();
+const settings = session.state.settings;
+
+// Gespeicherte Sprache gewinnt, sonst Browser-Sprache, sonst DE (GDD §8).
+setLocale(settings.locale ?? detectLocale());
+setAudioEnabled(settings.sound);
+setHapticsEnabled(settings.haptics);
+
+/* ------------------------------------------------------------------ */
+/* FSM                                                                 */
+/* ------------------------------------------------------------------ */
+
+const fsm = createFsm({
+  players: session.activePlayers().map((player) => player.id),
+  mode: settings.mode,
+  durationPreset: settings.duration,
+  ...(dev
+    ? {
+        onTransition: ({ from, to, event }: Transition) => {
+          console.info(`[fsm] ${from} --${event.type}--> ${to}`);
+        },
+      }
+    : {}),
+});
+
+/**
+ * ARENA → RESULT: Hier wird die Runde abgerechnet. `resolveRound` wendet nur die
+ * Modus-Regeln an (GDD §3.6) — das Opfer steht seit BET→ARENA fest.
+ * Als `enter`-Hook registriert, damit die Runde im Store steht, bevor der
+ * Result-Screen gemountet wird.
+ */
+fsm.on('RESULT', {
+  enter: (context) => {
+    if (!context.round) return;
+    session.recordRound(resolveRound(context.round));
+  },
 });
 
 /* ------------------------------------------------------------------ */
-/* i18n                                                                */
+/* Router                                                              */
 /* ------------------------------------------------------------------ */
 
-// Gespeicherte Sprache gewinnt, sonst Browser-Sprache, sonst DE (GDD §8).
-setLocale(session.settings.locale ?? detectLocale() ?? DEFAULT_SETTINGS.locale);
+const host = document.querySelector<HTMLElement>('#app');
+if (!host) throw new Error('#app fehlt in index.html');
+
+const router = createRouter({ host, context: { fsm, session, dev } });
+
+router.register('title', createTitleScreen);
+router.register('lobby', createLobbyScreen);
+router.register('pass', createPassScreen);
+router.register('bet', createBetScreen);
+router.register('arena', createArenaScreen);
+router.register('result', createResultScreen);
+
+const SCREEN_FOR_STATE: Record<GameState, ScreenId> = {
+  TITLE: 'title',
+  LOBBY: 'lobby',
+  PASS: 'pass',
+  BET: 'bet',
+  ARENA: 'arena',
+  RESULT: 'result',
+};
+
+/** Die Wipe-Farbe traegt Bedeutung: in PASS/BET die Spielerfarbe, im Reveal die des Opfers. */
+function wipeColor(state: GameState): string {
+  const context = fsm.context;
+
+  if (state === 'PASS' || state === 'BET') {
+    const playerId = context.players[context.playerIndex];
+    const player = playerId ? session.playerById(playerId) : undefined;
+    if (player) return hex(colorById(player.colorId).hex);
+  }
+
+  if (state === 'RESULT') {
+    const rounds = session.state.rounds;
+    const victimId = rounds[rounds.length - 1]?.victimId;
+    const victim = victimId ? session.playerById(victimId) : undefined;
+    if (victim) return hex(colorById(victim.colorId).hex);
+  }
+
+  return hex(UI_COLORS.accent);
+}
+
+const BACK_EVENTS = new Set(['cancel', 'changePlayers']);
+
+fsm.subscribe(({ to, event }) => {
+  void router.go(SCREEN_FOR_STATE[to], {
+    direction: BACK_EVENTS.has(event.type) ? 'back' : 'forward',
+    color: wipeColor(to),
+  });
+  updateHistoryGuard(to);
+});
+
+/* ------------------------------------------------------------------ */
+/* Zurück-Button (Roadmap M1.11)                                       */
+/* ------------------------------------------------------------------ */
+
+/** In diesen States kostet ein Zurück die laufende Runde — also erst fragen. */
+const GUARDED: ReadonlySet<GameState> = new Set<GameState>(['PASS', 'BET', 'ARENA']);
+
+let guarded = false;
+let dialogOpen = false;
+
+function pushGuard(): void {
+  globalThis.history?.pushState({ drinkshot: 'round' }, '');
+  guarded = true;
+}
+
+function updateHistoryGuard(state: GameState): void {
+  if (GUARDED.has(state)) {
+    if (!guarded) pushGuard();
+  } else {
+    guarded = false;
+  }
+}
+
+globalThis.addEventListener('popstate', () => {
+  const state = fsm.state;
+
+  if (GUARDED.has(state)) {
+    if (dialogOpen) return;
+    // Erst den Eintrag zurücklegen, damit wir stehen bleiben, während gefragt wird.
+    pushGuard();
+    dialogOpen = true;
+    void confirmSheet({
+      title: t('arena.abortRound'),
+      body: t('arena.abortBody'),
+      confirmLabel: t('arena.abortConfirm'),
+      cancelLabel: t('arena.abortCancel'),
+    }).then((confirmed) => {
+      dialogOpen = false;
+      if (confirmed) {
+        guarded = false;
+        fsm.send({ type: 'cancel' });
+      }
+    });
+    return;
+  }
+
+  if (state === 'RESULT') fsm.send({ type: 'changePlayers' });
+});
+
+/* ------------------------------------------------------------------ */
+/* Statische Texte & Service Worker                                    */
+/* ------------------------------------------------------------------ */
 
 /** Fuellt alle `[data-i18n]`-Knoten — kein UI-String steht im HTML. */
 function applyStaticTranslations(root: ParentNode = document): void {
@@ -51,59 +187,21 @@ function applyStaticTranslations(root: ParentNode = document): void {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* FSM (M0: nur Logging)                                               */
-/* ------------------------------------------------------------------ */
-
-export const fsm = createFsm({
-  players: session.players.map((player) => player.id),
-  mode: session.settings.mode,
-  durationPreset: session.settings.duration,
-  onTransition: ({ from, to, event }: Transition) => {
-    if (!store.get().dev) return;
-    console.info(`[fsm] ${from} --${event.type}--> ${to}`);
-  },
-});
-
-/* ------------------------------------------------------------------ */
-/* Boot-Screen                                                         */
-/* ------------------------------------------------------------------ */
-
-function renderBootScreen(host: HTMLElement): void {
-  host.replaceChildren();
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'boot';
-
-  const logo = document.createElement('h1');
-  logo.className = 'boot__logo';
-  logo.textContent = t('app.name').toUpperCase();
-
-  const tagline = document.createElement('p');
-  tagline.className = 'boot__tagline';
-  tagline.textContent = t('app.tagline');
-
-  const version = document.createElement('p');
-  version.className = 'boot__version';
-  version.textContent = `v${__APP_VERSION__} · ${fsm.state}`;
-
-  wrapper.append(logo, tagline, version);
-  host.append(wrapper);
-}
-
-/* ------------------------------------------------------------------ */
-/* Service Worker                                                      */
-/* ------------------------------------------------------------------ */
-
 async function registerServiceWorker(): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
   try {
     const { registerSW } = await import('virtual:pwa-register');
-    registerSW({
+    const update = registerSW({
       immediate: true,
-      // TODO(M6): Update-Toast statt stillem Reload (`pwa.updateAvailable`).
-      onNeedRefresh: () => console.info('[pwa]', t('pwa.updateAvailable')),
-      onOfflineReady: () => console.info('[pwa]', t('pwa.offlineReady')),
+      onNeedRefresh: () => {
+        showToast(t('pwa.updateAvailable'), {
+          durationMs: 8000,
+          action: { label: t('pwa.reload'), onClick: () => void update(true) },
+        });
+      },
+      onOfflineReady: () => {
+        if (dev) console.info('[pwa]', t('pwa.offlineReady'));
+      },
     });
   } catch (error) {
     console.warn('[pwa] Registrierung fehlgeschlagen', error);
@@ -114,13 +212,10 @@ async function registerServiceWorker(): Promise<void> {
 /* Start                                                               */
 /* ------------------------------------------------------------------ */
 
-function boot(): void {
-  const host = document.querySelector<HTMLElement>('#app');
-  if (!host) throw new Error('#app fehlt in index.html');
+applyStaticTranslations();
+void router.go(SCREEN_FOR_STATE[fsm.state]);
+void registerServiceWorker();
 
-  applyStaticTranslations();
-  renderBootScreen(host);
-  void registerServiceWorker();
+if (dev) {
+  Object.assign(globalThis, { drinkshot: { fsm, session, router } });
 }
-
-boot();

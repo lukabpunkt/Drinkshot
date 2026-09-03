@@ -10,7 +10,9 @@
     "confirm": "Bestätigen",
     "ok": "Alles klar",
     "sips_one": "Schluck",
-    "sips_other": "Schlücke"
+    "sips_other": "Schlücke",
+    "sipsCount_one": "{count} Schluck",
+    "sipsCount_other": "{count} Schlücke"
   },
   "title": {
     "play": "Spielen",
@@ -26,18 +28,23 @@
   },
   "lobby": {
     "headline": "Wer spielt mit?",
-    "addPlayer": "+ Spieler",
+    "addPlayer": "Spieler hinzufügen",
     "removePlayer": "{name} entfernen",
     "namePlaceholder": "Name",
+    "nameLabel": "Name von Spieler {index}",
+    "defaultName": "Spieler {index}",
     "start": "Los geht's!",
     "mode": "Modus",
     "duration": "Dauer",
+    "playerCount": "{count} von {max}",
     "tooFewPlayers": "Zu zweit ist's ein Duell, allein ist's traurig. Füge noch jemanden hinzu.",
-    "maxPlayers": "Mehr als {max} passen nicht ums Handy."
+    "maxPlayers": "Mehr als {max} passen nicht ums Handy.",
+    "eliminated": "Ausgeschieden"
   },
   "pass": {
     "handOver": "Gib das Handy an",
-    "tapWhenReady": "Tippe, wenn nur du aufs Display schaust"
+    "tapWhenReady": "Tippe, wenn nur du aufs Display schaust",
+    "position": "Spieler {index} von {count}"
   },
   "bet": {
     "headline": "Wie viele Schlücke setzt du?",
@@ -45,6 +52,7 @@
     "confirm": "Bestätigen & verstecken",
     "increase": "Einsatz erhöhen",
     "decrease": "Einsatz senken",
+    "value": "Dein Einsatz: {sips}",
     "risk": {
       "careful": "Vorsichtig",
       "bold": "Mutig",
@@ -55,15 +63,24 @@
   "arena": {
     "hud": "RUNDE {round} · {count} ZIELE",
     "lock": "LOCK",
+    "shot": "SHOT!",
+    "placeholder": "Hier läuft ab M2 die Arena.",
     "skip": "Tippen zum Überspringen",
     "abortRound": "Runde abbrechen?",
+    "abortBody": "Die Einsätze dieser Runde sind dann weg.",
     "abortConfirm": "Ja, abbrechen",
     "abortCancel": "Weiterspielen"
   },
   "result": {
     "drinks": "{name} trinkt {sips}!",
+    "drinksDistributor": "{name} verteilt {sips}!",
+    "everyoneElseDrinks": "Alle anderen trinken {sips}.",
+    "nobodyDrinks": "Niemand trinkt.",
     "miracle": "Niemand trinkt. Wunder passieren.",
     "miracleBadge": "Legende",
+    "eliminated": "{name} ist raus.",
+    "winner": "{name} hat überlebt und verteilt {sips}.",
+    "needMorePlayers": "Nur noch eine Person übrig. Ändere die Spieler für eine neue Session.",
     "allBets": "Alle Einsätze",
     "tableName": "Name",
     "tableBet": "Einsatz",
@@ -92,11 +109,13 @@
     "lowEffects": "Reduzierte Effekte",
     "language": "Sprache",
     "resetSession": "Session zurücksetzen",
+    "resetDone": "Session zurückgesetzt.",
     "durationOption": {
       "short": "Kurz",
       "normal": "Normal",
       "long": "Lang"
-    }
+    },
+    "durationSeconds": "{seconds} s"
   },
   "mode": {
     "classic": "Klassik",
@@ -104,9 +123,10 @@
     "distributor": "Verteiler",
     "distributorHint": "Alle anderen trinken den Einsatz des Getroffenen.",
     "suddenDeath": "Sudden Death",
-    "suddenDeathHint": "Wer getroffen wird, ist raus. Letzter Überlebender verteilt.",
+    "suddenDeathHint": "Wer getroffen wird, ist raus. Der Letzte verteilt.",
     "doubleTap": "Double Tap",
-    "doubleTapHint": "Zwei Schüsse, zwei Opfer."
+    "doubleTapHint": "Zwei Schüsse, zwei Opfer.",
+    "recommended": "Ab {count} Personen"
   },
   "rules": {
     "headline": "Regeln",
@@ -117,7 +137,8 @@
     "card3Title": "Trinken",
     "card3Body": "Wer getroffen wird, trinkt seinen Einsatz. Danach werden alle Einsätze aufgedeckt.",
     "card4Title": "Nochmal",
-    "card4Body": "Nächste Runde, gleiche Leute. Der Abend hat ein Scoreboard."
+    "card4Body": "Nächste Runde, gleiche Leute. Der Abend hat ein Scoreboard.",
+    "cardPosition": "Karte {index} von {count}"
   },
   "orientation": {
     "headline": "Bitte Handy drehen",

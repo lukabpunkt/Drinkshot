@@ -10,7 +10,9 @@
     "confirm": "Confirm",
     "ok": "Got it",
     "sips_one": "sip",
-    "sips_other": "sips"
+    "sips_other": "sips",
+    "sipsCount_one": "{count} sip",
+    "sipsCount_other": "{count} sips"
   },
   "title": {
     "play": "Play",
@@ -26,18 +28,23 @@
   },
   "lobby": {
     "headline": "Who's playing?",
-    "addPlayer": "+ Player",
+    "addPlayer": "Add player",
     "removePlayer": "Remove {name}",
     "namePlaceholder": "Name",
+    "nameLabel": "Name of player {index}",
+    "defaultName": "Player {index}",
     "start": "Let's go!",
     "mode": "Mode",
     "duration": "Duration",
+    "playerCount": "{count} of {max}",
     "tooFewPlayers": "Two makes a duel, one makes it sad. Add someone else.",
-    "maxPlayers": "More than {max} won't fit around one phone."
+    "maxPlayers": "More than {max} won't fit around one phone.",
+    "eliminated": "Out"
   },
   "pass": {
     "handOver": "Hand the phone to",
-    "tapWhenReady": "Tap when nobody else is looking"
+    "tapWhenReady": "Tap when nobody else is looking",
+    "position": "Player {index} of {count}"
   },
   "bet": {
     "headline": "How many sips do you bet?",
@@ -45,6 +52,7 @@
     "confirm": "Confirm & hide",
     "increase": "Increase bet",
     "decrease": "Decrease bet",
+    "value": "Your bet: {sips}",
     "risk": {
       "careful": "Careful",
       "bold": "Bold",
@@ -55,15 +63,24 @@
   "arena": {
     "hud": "ROUND {round} · {count} TARGETS",
     "lock": "LOCK",
+    "shot": "SHOT!",
+    "placeholder": "The arena lands here in M2.",
     "skip": "Tap to skip",
     "abortRound": "Abort the round?",
+    "abortBody": "This round's bets will be gone.",
     "abortConfirm": "Yes, abort",
     "abortCancel": "Keep playing"
   },
   "result": {
     "drinks": "{name} drinks {sips}!",
+    "drinksDistributor": "{name} hands out {sips}!",
+    "everyoneElseDrinks": "Everyone else drinks {sips}.",
+    "nobodyDrinks": "Nobody drinks.",
     "miracle": "Nobody drinks. Miracles happen.",
     "miracleBadge": "Legend",
+    "eliminated": "{name} is out.",
+    "winner": "{name} survived and hands out {sips}.",
+    "needMorePlayers": "Only one person left. Change the players to start a new session.",
     "allBets": "All bets",
     "tableName": "Name",
     "tableBet": "Bet",
@@ -92,11 +109,13 @@
     "lowEffects": "Reduced effects",
     "language": "Language",
     "resetSession": "Reset session",
+    "resetDone": "Session reset.",
     "durationOption": {
       "short": "Short",
       "normal": "Normal",
       "long": "Long"
-    }
+    },
+    "durationSeconds": "{seconds} s"
   },
   "mode": {
     "classic": "Classic",
@@ -104,9 +123,10 @@
     "distributor": "Distributor",
     "distributorHint": "Everyone else drinks the victim's bet.",
     "suddenDeath": "Sudden Death",
-    "suddenDeathHint": "Get hit, you're out. Last one standing distributes.",
+    "suddenDeathHint": "Get hit, you're out. The last one hands out.",
     "doubleTap": "Double Tap",
-    "doubleTapHint": "Two shots, two victims."
+    "doubleTapHint": "Two shots, two victims.",
+    "recommended": "For {count}+ people"
   },
   "rules": {
     "headline": "Rules",
@@ -117,7 +137,8 @@
     "card3Title": "Drink",
     "card3Body": "Whoever gets hit drinks their bet. Then all bets are revealed.",
     "card4Title": "Again",
-    "card4Body": "Next round, same people. The night keeps a scoreboard."
+    "card4Body": "Next round, same people. The night keeps a scoreboard.",
+    "cardPosition": "Card {index} of {count}"
   },
   "orientation": {
     "headline": "Please rotate your phone",

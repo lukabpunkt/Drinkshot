@@ -17,6 +17,7 @@ function fakeDraw(bets: readonly Bet[]): RoundSetup {
     victimId: bets[0]!.playerId,
     extraVictimIds: [],
     deathId: 'basic_fall',
+    zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
   };

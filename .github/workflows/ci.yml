@@ -70,7 +70,8 @@ jobs:
       - run: npm ci
 
       - name: Playwright-Browser installieren
-        run: npx playwright install --with-deps chromium
+        # iPhone 12 laeuft in Playwright unter WebKit (Safari-Referenz), Pixel 5 unter Chromium.
+        run: npx playwright install --with-deps chromium webkit
 
       - name: E2E-Flow
         run: npm run test:e2e

@@ -16,7 +16,8 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       reporter: ['text', 'json-summary', 'html'],
       include: ['src/core/**/*.ts'],
-      exclude: ['src/core/choreographer.ts', 'src/core/session.ts', 'src/core/i18n.ts'],
+      // choreographer wird in M3 implementiert und dann mitgemessen.
+      exclude: ['src/core/choreographer.ts'],
       thresholds: {
         'src/core/fsm.ts': {
           branches: 100,

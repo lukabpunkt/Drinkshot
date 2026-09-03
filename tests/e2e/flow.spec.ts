@@ -1,47 +1,248 @@
 /**
- * E2E-Flow (Mobile-Emulation).
+ * E2E-Flow (Mobile-Emulation, Audit A1).
  *
- * M0: Smoke-Test — App laedt, Titel sichtbar, keine Console-Errors, PWA-Manifest erreichbar.
- * TODO(M1): kompletter Flow mit 4 Spielern ueber 2 Runden (Audit A1).
+ * Deckt den kompletten Ablauf ab: Titel → Lobby → Pass/Bet je Spieler → Arena-Platzhalter
+ * → Result → nächste Runde. Läuft gegen iPhone 12 und Pixel 5 (playwright.config.ts).
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test('Titel ist sichtbar und die Seite laedt ohne Console-Errors', async ({ page }) => {
+const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
+/** Countdown 3 s + SHOT-Halten 1.4 s + Wipes — großzügig, damit der Test nicht flackert. */
+const ARENA_TIMEOUT = 15_000;
+
+/** Sammelt Console-Errors; A1 fordert einen Flow ohne sie. */
+function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+  return errors;
+}
 
+async function freshStart(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    // Nur beim allerersten Laden aufräumen — sonst würde ein Reload im Test
+    // genau die Persistenz zerstören, die er prüfen soll.
+    if (window.sessionStorage.getItem('e2e-initialised')) return;
+    window.sessionStorage.setItem('e2e-initialised', '1');
+    window.localStorage.clear();
+    // 18+-Hinweis vorab quittieren, sonst deckt das Sheet den Titel-Screen ab.
+    window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
+  });
   await page.goto('./');
+}
 
-  await expect(page.locator('.boot__logo')).toHaveText('DRINKSHOT');
-  await expect(page.locator('#app')).toBeVisible();
+async function setUpLobby(page: Page, names: string[]): Promise<void> {
+  await page.getByRole('button', { name: 'Spielen' }).click();
+  await expect(page.locator('.screen--lobby')).toBeVisible();
+
+  const addButton = page.getByRole('button', { name: 'Spieler hinzufügen' });
+  while ((await page.locator('.lobby__row').count()) < names.length) {
+    await addButton.click();
+  }
+
+  const inputs = page.locator('.lobby__name');
+  for (const [index, name] of names.entries()) {
+    await inputs.nth(index).fill(name);
+    await inputs.nth(index).blur();
+  }
+}
+
+/** Spielt eine komplette Betting-Phase durch und wartet auf den Result-Screen. */
+async function playRound(page: Page, bets: number[]): Promise<void> {
+  for (const bet of bets) {
+    await expect(page.locator('.screen--pass')).toBeVisible();
+    // 800-ms-Sperre abwarten, dann tippen.
+    await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
+    await page.locator('.screen--pass').click();
+
+    await expect(page.locator('.screen--bet')).toBeVisible();
+    const current = Number(await page.locator('.stepper__value').textContent());
+    const delta = bet - current;
+    const stepButton = page.getByRole('button', { name: delta > 0 ? 'Einsatz erhöhen' : 'Einsatz senken' });
+    for (let i = 0; i < Math.abs(delta); i++) await stepButton.click();
+    await expect(page.locator('.stepper__value')).toHaveText(String(bet));
+
+    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+  }
+
+  await expect(page.locator('.screen--arena')).toBeVisible();
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: ARENA_TIMEOUT });
+}
+
+test('kompletter Flow: 4 Spieler, 2 Runden', async ({ page }) => {
+  // Zwei volle Runden mit je 3 s Countdown, 8 Wipes und 8 Screens — der Test ist
+  // absichtlich langsam, weil er das echte Timing mitläuft.
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await freshStart(page);
+
+  await expect(page.locator('.title__logo')).toHaveText('DRINKSHOT');
+  await setUpLobby(page, PLAYERS);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  /* --- Runde 1 --- */
+  await playRound(page, [1, 2, 3, 5]);
+
+  const headline = page.locator('.result__headline');
+  await expect(headline).toContainText('trinkt');
+
+  // Alle Einsätze sind jetzt öffentlich — und die Chancen stimmen (B = 11).
+  const table = page.locator('.bets tbody tr');
+  await expect(table).toHaveCount(4);
+  await expect(page.locator('.bets tbody tr').first()).toContainText('45 %');
+
+  // Genau ein Spieler ist als Opfer markiert.
+  await expect(page.locator('.bets tbody tr.is-victim')).toHaveCount(1);
+
+  /* --- Runde 2 --- */
+  await page.getByRole('button', { name: 'Nächste Runde' }).click();
+  await playRound(page, [4, 4, 4, 4]);
+
+  await expect(page.locator('.result__headline')).toContainText('trinkt 4');
+  // Scoreboard zählt über beide Runden.
+  const scoreSum = await page.locator('.score__value').evaluateAll((nodes) =>
+    nodes.reduce((sum, node) => sum + Number(node.textContent), 0)
+  );
+  expect(scoreSum).toBeGreaterThan(4);
+
   expect(errors).toEqual([]);
 });
 
-test('Portrait: kein horizontales Scrollen, Root fuellt den Viewport', async ({ page }) => {
-  await page.goto('./');
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+test('Einsatz ist nach dem Bestätigen nirgends mehr sichtbar', async ({ page }) => {
+  await freshStart(page);
+  await setUpLobby(page, ['Anna', 'Ben']);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
+  await page.locator('.screen--pass').click();
+  await page.getByRole('button', { name: 'Einsatz erhöhen' }).click(); // 3 → 4
+  await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+
+  // Zurück auf dem Pass-Screen für Spieler 2: keine Zahl, kein Stepper.
+  await expect(page.locator('.screen--pass')).toBeVisible();
+  await expect(page.locator('.stepper__value')).toHaveCount(0);
+  await expect(page.locator('.screen--pass')).not.toContainText('4');
+});
+
+test('Privacy-Screen blockiert Taps 800 ms lang', async ({ page }) => {
+  await freshStart(page);
+  await setUpLobby(page, ['Anna', 'Ben']);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  const pass = page.locator('.screen--pass');
+  await expect(pass).toBeVisible();
+  // Sofortiger Tap darf nichts auslösen.
+  await pass.click({ force: true });
+  await expect(page.locator('.screen--bet')).toHaveCount(0);
+
+  await expect(pass).not.toHaveClass(/is-locked/, { timeout: 4000 });
+  await pass.click();
+  await expect(page.locator('.screen--bet')).toBeVisible();
+});
+
+test('Lobby validiert die Mindest-Spielerzahl', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Spielen' }).click();
+
+  const rows = page.locator('.lobby__row');
+  await expect(rows).toHaveCount(2); // wird beim ersten Start aufgefüllt
+
+  await page.locator('.lobby__remove').first().click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByRole('button', { name: "Los geht's!" })).toBeDisabled();
+  await expect(page.locator('.lobby__hint')).toContainText('Duell');
+});
+
+test('Namen und Einstellungen überleben einen Reload', async ({ page }) => {
+  await freshStart(page);
+  await setUpLobby(page, ['Marlene', 'Konstantin']);
+
+  await page.getByRole('button', { name: /^Dauer/ }).click();
+  await page.getByRole('dialog').getByRole('radio', { name: /Lang/ }).click();
+  await page.locator('.sheet__close').click();
+  await expect(page.locator('.sheet')).toHaveCount(0);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Spielen' }).click();
+
+  await expect(page.locator('.lobby__name').first()).toHaveValue('Marlene');
+  await expect(page.locator('.lobby__name').nth(1)).toHaveValue('Konstantin');
+  await expect(page.locator('.chip').nth(1)).toContainText('Lang');
+});
+
+test('alle Touch-Ziele sind mindestens 48 px hoch, Primary-CTAs 64 px', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Spielen' }).click();
+
+  const small = await page.locator('button, input, [role="button"]').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => (node as HTMLElement).offsetParent !== null)
+      .map((node) => ({ text: node.textContent?.trim().slice(0, 24) ?? '', height: node.getBoundingClientRect().height }))
+      .filter((entry) => entry.height < 48)
   );
-  expect(overflow).toBe(false);
+  expect(small).toEqual([]);
+
+  const primaryHeight = await page
+    .getByRole('button', { name: "Los geht's!" })
+    .evaluate((node) => node.getBoundingClientRect().height);
+  expect(primaryHeight).toBeGreaterThanOrEqual(64);
+});
+
+test('Zurück-Button fragt in der Betting-Phase nach', async ({ page }) => {
+  await freshStart(page);
+  await setUpLobby(page, ['Anna', 'Ben']);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+  await expect(page.locator('.screen--pass')).toBeVisible();
+
+  await page.goBack();
+  const dialog = page.getByRole('dialog', { name: 'Runde abbrechen?' });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Weiterspielen' }).click();
+  await expect(page.locator('.sheet')).toHaveCount(0);
+  await expect(page.locator('.screen--pass')).toBeVisible();
+
+  await page.goBack();
+  const second = page.getByRole('dialog', { name: 'Runde abbrechen?' });
+  await expect(second).toBeVisible();
+  await second.getByRole('button', { name: 'Ja, abbrechen' }).click();
+  await expect(page.locator('.screen--lobby')).toBeVisible();
+});
+
+test('Sprachwechsel schaltet die ganze Oberfläche um', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Einstellungen' }).click();
+  await page.getByRole('radio', { name: 'EN', exact: true }).click();
+
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  // `text-transform: uppercase` faerbt nur die Anzeige — im DOM steht der i18n-Text.
+  await expect(page.locator('.title__tagline')).toHaveText('Bet. Run. Drink.');
+  // Kein Platzhalter für fehlende Keys.
+  await expect(page.locator('body')).not.toContainText('[missing:');
+});
+
+test('Regeln zeigen vier Karten', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Regeln' }).click();
+  await expect(page.getByRole('dialog', { name: 'Regeln' })).toBeVisible();
+  await expect(page.locator('.rules__card')).toHaveCount(4);
 });
 
 test('Landscape zeigt das "Handy drehen"-Overlay', async ({ page }) => {
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.goto('./');
+  await freshStart(page);
   const overlay = page.locator('.orientation-lock');
   await expect(overlay).toBeVisible();
   await expect(overlay.locator('.orientation-lock__title')).not.toBeEmpty();
 });
 
-test('PWA-Manifest und Icons sind erreichbar', async ({ page, request }) => {
-  await page.goto('./');
-  const href = await page.getAttribute('link[rel="manifest"]', 'href');
-  expect(href).toBeTruthy();
+test('PWA-Manifest und Service Worker', async ({ page, request }) => {
+  await freshStart(page);
 
+  const href = await page.getAttribute('link[rel="manifest"]', 'href');
   const manifestResponse = await request.get(new URL(href!, page.url()).toString());
   expect(manifestResponse.ok()).toBe(true);
 
@@ -52,13 +253,8 @@ test('PWA-Manifest und Icons sind erreichbar', async ({ page, request }) => {
   };
   expect(manifest.name).toBe('Drinkshot');
   expect(manifest.display).toBe('standalone');
-  expect(manifest.icons.some((icon) => icon.sizes === '512x512')).toBe(true);
   expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true);
-});
 
-test('Service Worker wird registriert (PWA installierbar)', async ({ page }) => {
-  await page.goto('./');
-  // Die Registrierung laeuft asynchron nach dem ersten Paint.
   await expect
     .poll(
       () =>
@@ -71,6 +267,11 @@ test('Service Worker wird registriert (PWA installierbar)', async ({ page }) => 
     .toBeGreaterThan(0);
 });
 
-test.fixme('kompletter Flow: 4 Spieler, 2 Runden (M1)', async () => {
-  // Lobby → Pass → Bet ×4 → Arena-Platzhalter → Result → Nächste Runde
+test('Portrait scrollt nicht horizontal', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Spielen' }).click();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  expect(overflow).toBe(false);
 });

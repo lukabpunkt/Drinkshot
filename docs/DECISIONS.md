@@ -33,3 +33,15 @@ Kontext: Die Interfaces `Player`, `RoundSetup`, `RoundResult`, `Session` brauche
 ## ADR-8 · 2026-09-03 · `cancel` als expliziter FSM-Übergang aus PASS/BET/ARENA
 
 Kontext: §3 fordert das Abfangen des Back-Buttons in PASS/BET/ARENA ("Runde abbrechen?"), nennt aber keinen Übergang. Entscheidung: Ein Event `cancel` führt aus diesen drei States nach LOBBY und verwirft Einsätze und Runde. Konsequenz: Der Abbrechen-Dialog (M1) sendet nur dieses Event; Fairness bleibt gewahrt, weil eine abgebrochene Runde keine Ziehung hinterlässt.
+
+## ADR-9 · 2026-09-03 · `SessionStore` als geteilter Zustand der Screens
+Kontext: Screens brauchen Spieler, Settings, Runden und Scoreboard, ohne dass jeder selbst in den localStorage greift. Entscheidung: `core/session.ts` exportiert einen `SessionStore` (Store + Aktionen + Persistenz bei jeder Änderung); der Router reicht ihn als `ScreenContext` durch. Konsequenz: Kein Typ-Zirkel über `main.ts`, Screens bleiben dumm, Persistenz passiert an genau einer Stelle.
+
+## ADR-10 · 2026-09-03 · Sudden Death: der Letzte verteilt die Einsätze **der Schlussrunde**
+Kontext: GDD §3.6 sagt "letzter Überlebender bekommt die Summe aller Einsätze zum Verteilen" — offen bleibt, ob damit die Runde oder die Session gemeint ist. Entscheidung: die Summe der Einsätze jener Runde, in der der Vorletzte ausscheidet (`sipsToDistribute`). Konsequenz: Am Tisch nachrechenbar, ohne die ganze Session zu addieren; die Zahl steht im `RoundResult` und ist unit-getestet.
+
+## ADR-11 · 2026-09-03 · Ausgeschiedene werden aus der Runden-History abgeleitet
+Kontext: Sudden Death braucht "wer ist raus", das Datenmodell in §4 kennt aber kein solches Feld. Entscheidung: `RoundResult.eliminatedIds` pro Runde speichern, `eliminatedPlayerIds(session)` leitet den Stand daraus ab. Konsequenz: Kein zusätzlicher Zustand, der auseinanderlaufen könnte; `resetRounds()` hebt das Ausscheiden automatisch auf.
+
+## ADR-12 · 2026-09-03 · Haptik in `src/ui/haptics.ts`
+Kontext: `navigator.vibrate` wird von Screens und Komponenten gebraucht, passt aber weder in `core/` (kein Spielzustand) noch in `audio/`. Entscheidung: eigenes Modul `src/ui/haptics.ts` mit benannten Mustern (`tap`, `confirm`, `shot`, `reveal`). Konsequenz: Eine Datei mehr als in §2 gelistet (siehe ADR-5); dafür schlägt Haptik auf iOS still fehl statt irgendwo zu werfen.

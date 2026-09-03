@@ -38,6 +38,9 @@ jobs:
         run: npm run build
 
       - uses: actions/configure-pages@v5
+        with:
+          # Aktiviert Pages beim ersten Lauf selbst, statt einen manuellen Klick zu verlangen.
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -63,7 +63,10 @@ describe(`Fairness-Kette über ${ROUNDS.toLocaleString('de-DE')} Runden`, () => 
   it('der Todes-Beat trägt dieselbe DeathId wie das Setup', () => {
     for (let round = 0; round < 300; round++) {
       const { players, bets } = randomBets(round);
-      const setup = createRoundSetup(bets, 'classic', 'normal', `death_${round % 7}`);
+      const setup = createRoundSetup(bets, 'classic', 'normal', () => ({
+        deathId: `death_${round % 7}`,
+        zone: 'body',
+      }));
       const script = buildShowScript({
         players,
         victimId: setup.victimId,

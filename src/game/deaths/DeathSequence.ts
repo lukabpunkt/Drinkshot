@@ -26,7 +26,13 @@ export interface FxKit {
 }
 
 export interface DeathAudio {
-  play(cue: string): void;
+  /**
+   * @param cue    Name des Sound-Cues
+   * @param when   Vorlauf in Sekunden auf der Audio-Uhr — so lassen sich Cues exakt auf
+   *               Key-Frames legen, statt sie im Frame-Loop zu triggern (Audit A3/A4).
+   * @param detune Verstimmung in Halbtönen; variiert wiederholte Geräusche.
+   */
+  play(cue: string, when?: number, detune?: number): void;
 }
 
 export interface DeathContext {
@@ -47,6 +53,11 @@ export interface DeathSequence {
   weight: number;
   /** Braucht die Sequenz einen zweiten Schuss (Bein, Miss)? */
   needsSecondShot: boolean;
+  /**
+   * Optionaler Riegel: Manche Sequenzen brauchen eine Voraussetzung — `head_hat_launch`
+   * etwa einen Hut, den rund 40 % der Männchen nicht tragen. Die Auswahl fragt vorher.
+   */
+  isEligible?(ctx: DeathContext): boolean;
   build(ctx: DeathContext): gsap.core.Timeline;
 }
 
@@ -90,6 +101,12 @@ export interface PickDeathOptions {
   recent?: readonly DeathId[];
   /** Sind Wunder erlaubt (Settings)? */
   miracles?: boolean;
+  /**
+   * Kontext für `isEligible`. Fehlt er (etwa bei der Ziehung, wo es noch keine Shotlings
+   * gibt), werden Sequenzen mit Voraussetzung übersprungen — lieber eine Sequenz weniger
+   * als eine, die nicht spielbar ist.
+   */
+  context?: DeathContext;
   /** Nur für Tests: statt der globalen Registry diese Liste verwenden. */
   pool?: readonly DeathSequence[];
 }
@@ -109,6 +126,12 @@ export function pickDeath(options: PickDeathOptions): DeathSequence {
     (sequence) => allowMiracles || sequence.zone !== 'miracle'
   );
   if (candidates.length === 0) candidates = [...all];
+
+  // Voraussetzungen prüfen (z. B. „trägt einen Hut").
+  const eligible = candidates.filter(
+    (sequence) => !sequence.isEligible || (options.context && sequence.isEligible(options.context))
+  );
+  if (eligible.length > 0) candidates = eligible;
 
   if (candidates.length >= DEATH_NO_REPEAT_MIN_POOL) {
     const blocked = new Set((options.recent ?? []).slice(-DEATH_NO_REPEAT_WINDOW));

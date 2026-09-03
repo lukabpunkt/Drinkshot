@@ -6,7 +6,7 @@
 | M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
 | M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
 | M3 Scope, Choreo, Schuss | ✅ fertig (⏳ 3 manuelle Checks offen) | `v0.3.0` | A3 bestanden |
-| M4 Todesanimationen | ⬜ offen | – | – |
+| M4 Todesanimationen | 🟡 M4a fertig (6 von 12) | – | Zwischenbericht |
 | M5 Polish, Modi, A11y | ⬜ offen | – | – |
 | M6 Playtest & Release | ⬜ offen | – | – |
 
@@ -281,3 +281,91 @@ Dazu ein Nachtrag aus der CI: Der erste Lauf war rot. Auf einem Runner ohne GPU 
 - [ ] **Wake-Lock:** Bleibt das Display während einer 22-Sekunden-Show (Preset „Lang") an?
 
 **Zum Anschauen:** `docs/screens/m3-intro.png`, `-scan`, `-panik`, `-lock`, `-shot`, `-tod` — die sechs Phasen der Show in der Reihenfolge, in der sie laufen.
+
+## Zwischenbericht M4a — 2026-09-03
+
+Die Roadmap teilt M4 in drei Etappen. **M4a (Kopf + Brust) ist fertig**: sechs Sequenzen,
+jede einzeln im Dev-Panel abspielbar und unit-getestet. Bein, Po und Miss folgen in M4b,
+Miracle und Politur in M4c. Der Tag `v0.4.0` bleibt bis dahin reserviert.
+
+### Die sechs Sequenzen gegen die A4-Kriterien
+
+| Sequenz | Zone | Dauer | Anticipation | Hit-Stop | Squash | Easing | Sound-Cues | Grabstein + Nachbeben |
+|---|---|---|---|---|---|---|---|---|
+| `head_helmet_spin` | Kopf | 3,22 s | Kopf zieht gegen die Drehrichtung | 80 ms | ✅ | `back.in`, `elastic.out` | 6 verschiedene | ✅ |
+| `head_hat_launch` | Kopf | 4,42 s | Hut sackt vor dem Start | 80 ms | ✅ | `back.in`, `elastic.out` | 6 | ✅ |
+| `head_xray` | Kopf | 1,71 s | 4 Frames Skelett-Flackern | 80 ms | ✅ | `power3.in`, `elastic.out` | 5 | ✅ |
+| `body_dramatic` | Brust | 3,74 s | Hand fährt an die Brust | 80 ms | ✅ | `back.out`, `back.in` | 5 | ✅ |
+| `body_deflate` | Brust | 2,78 s | bläht sich auf vor dem Start | 80 ms | ✅ | `power3.out`, `elastic.out` | 4 | ✅ |
+| `body_freeze_shatter` | Brust | 2,71 s | Zittern beim Zufrieren | 80 ms | ✅ | `back.in`, `back.out` | 6 | ✅ |
+| `basic_fall` (bleibt) | Brust | 1,81 s | kippt gegen die Fallrichtung | 80 ms | ✅ | `back.in`, `elastic.out` | 4 | ✅ |
+
+Alle Werte sind gemessen, nicht abgehakt: Die Dauern kommen aus `timeline.duration()`, die
+Cues aus einem mitschreibenden Audio-Double, Hit-Stop und Abschluss aus eigenen Tests
+(`tests/unit/deaths.test.ts`, 60 Tests). Grenze laut Architektur §6 ist 1,5–4,5 s — die
+längste Sequenz liegt bei 4,42 s, also knapp darunter.
+
+### Gesamt-Checks
+
+| Check | Status | Notiz |
+|---|---|---|
+| Sequenzen registriert, Dev-Preview zeigt alle | ✅ | `?dev=1&panel=deaths` startet direkt in der Arena, Dropdown mit allen sieben, ▶ spielt sofort. `npm run preview:deaths` öffnet das. |
+| No-Repeat-Fenster 4 über 1 000 Runden | ✅ | greift ab 8 registrierten Sequenzen; bis dahin bewusst inaktiv, sonst gäbe es keine Auswahl mehr |
+| Nach Sequenz + Reset ist der Shotling wieder `idle` | ✅ | pro Sequenz geprüft, inklusive Skalierung, Rotation, Alpha, Hut-Zugehörigkeit und Overlays |
+| Result-Screen zeigt die richtige Zone | ✅ | `round.zone` kommt jetzt aus der Registry statt aus einem Platzhalter |
+| Kein Frame-Drop während der Sequenz (max. 2 Long-Tasks) | ✅ | **0 Long-Tasks**, p50 16,7 ms · p95 17,6 ms bei CPU 4× — mit den neuen Sequenzen gemessen |
+| Draw-Calls | ✅ | 5 (Arena 1 + Scope), unverändert zu M3 |
+| Heap über 30 s | ✅ | +621 KB |
+| Zweiter Schuss (leg/miss) | ⬜ M4b | Interface (`needsSecondShot`, `ctx.scope`) steht bereit |
+| „Lustig-Test": 3 Personen, ≥ 2 lachen | ⏳ manuell | genau dafür ist der Schnitt nach sechs Sequenzen da |
+
+### Fünf gefundene Fehler
+
+1. **Nach `body_deflate` blieb das Männchen für immer platt.** `reset()` stellte alles
+   wieder her — Rotation, Position, Alpha, jedes Rig-Teil — nur die **Skalierung** nicht.
+   Der Fehler war lautlos: Die nächste Runde begann mit einem plattgedrückten Shotling.
+   Mein eigener Reset-Test hat ihn übersehen, weil er die Skalierung nicht geprüft hat.
+   Beides behoben.
+2. **Grabsteine sammelten sich an.** Beim wiederholten Abspielen im Dev-Panel stand nach
+   fünf Durchläufen ein Friedhof herum. `clearDeathProps()` räumt jetzt vorher ab; die
+   Requisiten tragen dafür ein Label.
+3. **In der Death-Preview lief die automatische Show mit.** Zwei Todesanimationen
+   gleichzeitig auf zwei verschiedenen Männchen — man beurteilte die falsche. Die Preview
+   startet den ShowDirector jetzt gar nicht erst.
+4. **Der Eisblock verdeckte den Erfrorenen komplett.** Deckkraft von 0,92 auf 0,78 und die
+   Farbverläufe im SVG deutlich transparenter.
+5. **Die Kopf-Schraube war nicht lesbar.** Ein runder Kopf, der sich dreht, sieht aus wie
+   ein runder Kopf — nur der Hut verriet die Bewegung. Jetzt schraubt sich der Kopf
+   sichtbar in den Torso hinein, wird dabei schmaler und kommt mit Überschwung zurück.
+
+Dazu zwei Test-Reparaturen: Der JS-Zeit-Test verlangte 60 Messwerte aus 6 Sekunden — auf
+einem Runner ohne GPU kommen unter 4-facher Drosselung keine 60 Frames zustande, obwohl
+die eigentliche Aussage stimmte. Und der Dauer-Preset-Test maß bis zum Result, also
+inklusive Todesanimation; seit die je nach Sequenz zwischen 1,7 und 4,4 s dauert, schwankte
+die Differenz um zwei Sekunden. Er misst jetzt bis zum **Schuss** — genau das, was das
+Preset steuert. Ergebnis stabil: Kurz 9,84 s, Lang 20,4 s.
+
+### Was M4a technisch gebracht hat
+
+- **Rig-Zugriff für Sequenzen**: `victim.rig` gibt Kopf, Torso, Arme, Beine, Füße, Gesicht,
+  Hut und Schatten frei. `setDriven()` nimmt der Automatik die Kontrolle ab (sonst zöge das
+  Brain das fliegende Männchen jeden Frame zurück), `detachHat()` löst den Hut für den
+  Abschuss, `addOverlay()` legt Skelett und Eis über den Körper.
+- **Gemeinsamer Abschluss** `finishDeath()`: Grabstein, Nachbeben-Zoom und „die anderen
+  bleiben stehen, schauen hin, einer klatscht". Einmal geschrieben statt zwölfmal kopiert —
+  und der Test prüft, dass jede Sequenz ihn benutzt.
+- **`createCanvasTexture()`**: Grabstein, Sprechblase und Partikel fallen sauber zurück,
+  wenn kein 2D-Kontext da ist. Das macht die Sequenzen in jsdom testbar und schützt
+  nebenbei Browser mit abgeschaltetem Canvas.
+- **Echte Death-Auswahl**: `createRoundSetup` bekommt die Wahl als Callback herein, damit
+  `core/` nicht auf `game/` zeigen muss. Die Auswahl hängt am Seed der Runde — dieselbe
+  Runde lässt sich später identisch abspielen.
+
+**Zum Anschauen:** `docs/screens/m4a-<id>.png` — pro Sequenz acht Frames über die Laufzeit
+nebeneinander. Besser als ein Video, weil man die Key-Frames vergleichen kann.
+
+**Was Luka beurteilen muss:**
+- [ ] **Zündet der Gag?** Jede Sequenz einmal ansehen (`npm run preview:deaths` oder das
+      Dropdown links unten). Welche funktioniert, welche nicht?
+- [ ] Ist `body_dramatic` mit dem doppelten Aufstehen zu lang oder genau richtig?
+- [ ] Liest sich `head_helmet_spin` als Schraube — oder muss der Kopf noch tiefer rein?

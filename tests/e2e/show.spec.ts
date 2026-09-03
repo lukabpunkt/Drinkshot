@@ -100,8 +100,25 @@ test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => 
       await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
     }
     await page.locator('.screen--arena').waitFor({ timeout: 30_000 });
+    /*
+     * Erst warten, bis die Atlanten stehen. Beim ersten Durchlauf werden sie hier noch
+     * geladen — läuft das in die Messung hinein, ist die erste Messung um die Ladezeit
+     * zu lang und die Differenz stimmt nicht mehr.
+     */
+    await expect(page.locator('.screen--arena')).not.toHaveClass(/is-loading/, {
+      timeout: 30_000,
+    });
     const started = Date.now();
-    await page.locator('.screen--result').waitFor({ timeout: 90_000 });
+    /*
+     * Bis zum **Schuss** messen, nicht bis zum Result.
+     *
+     * Das Dauer-Preset steuert das Drehbuch — Intro, Scan, Panik, Lock. Die
+     * Todesanimation kommt danach und ist seit M4a absichtlich variabel: je nach
+     * gewürfelter Sequenz 2,6 bis 4,5 s. Bis zum Result gemessen schwankt die Differenz
+     * dadurch um zwei Sekunden und sagt nichts mehr über das Preset aus.
+     * `.arena__skip` erscheint genau mit dem Schuss.
+     */
+    await page.locator('.arena__skip').waitFor({ state: 'visible', timeout: 90_000 });
     return Date.now() - started;
   };
 
@@ -109,7 +126,9 @@ test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => 
   const software = await isSoftwareRenderer(page);
   const long = await measure(/Lang/);
 
-  console.log(`Kurz ${short} ms · Lang ${long} ms${software ? ' (Software-Renderer)' : ''}`);
+  console.log(
+    `Kurz ${short} ms · Lang ${long} ms (bis zum Schuss)${software ? ' — Software-Renderer' : ''}`
+  );
 
   // Grundaussage gilt überall: „Lang" dauert spürbar länger als „Kurz".
   expect(long).toBeGreaterThan(short + 5_000);
@@ -119,8 +138,9 @@ test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => 
     software,
     'Software-Renderer: PIXI klemmt lange Frames ab, die Show läuft dann gedehnt.'
   );
-  expect(long - short).toBeGreaterThan(8_000);
-  expect(long - short).toBeLessThan(16_000);
+  // 22 s minus 10 s Skript, plus etwas Luft für Wipes und Anlaufzeit.
+  expect(long - short).toBeGreaterThan(9_000);
+  expect(long - short).toBeLessThan(15_000);
 });
 
 test('Filter sind ausserhalb von Lock und Schuss abgeschaltet (Audit A3)', async ({ page }) => {

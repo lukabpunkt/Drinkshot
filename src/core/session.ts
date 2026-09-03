@@ -19,7 +19,7 @@ import {
 } from '@/config/rules';
 import { COLOR_IDS, type ColorId, type HatId } from '@/config/theme';
 import { computeOdds, pickVictims, totalSips, type Bet, type PlayerId } from './lottery';
-import { createSeed } from './rng';
+import { createSeed, createSeededRng, type SeededRng } from './rng';
 import { createStore, type Unsubscribe } from './store';
 
 /** ID einer Todesanimation, z. B. `head_helmet_spin` (GDD §4.1). */
@@ -89,24 +89,39 @@ export function createEmptySession(): Session {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Wählt die Todesanimation. Bekommt den **seedbaren** PRNG der Runde, damit dieselbe
+ * Runde später identisch abgespielt werden kann („Show erneut abspielen" im Dev-Panel).
+ */
+export type ChooseDeath = (rng: SeededRng) => { deathId: DeathId; zone: DeathZone };
+
+/**
  * Erzeugt das RoundSetup fuer den Uebergang BET → ARENA.
  * Ruft `pickVictims` (und damit `crypto.getRandomValues`) genau einmal auf.
+ *
+ * `chooseDeath` wird von aussen hereingereicht, weil die Death-Registry in `game/` lebt —
+ * ein Import von dort nach `core/` würde die Schichtung umdrehen. Der Seed entsteht
+ * zuerst, die Auswahl läuft auf dem daraus abgeleiteten PRNG.
  */
 export function createRoundSetup(
   bets: readonly Bet[],
   mode: GameMode,
   durationPreset: DurationPreset,
-  deathId: DeathId = PLACEHOLDER_DEATH_ID,
-  zone: DeathZone = PLACEHOLDER_DEATH_ZONE
+  chooseDeath?: ChooseDeath
 ): RoundSetup {
   const victims = pickVictims(bets, MODE_SPECS[mode].victims);
+  const seed = createSeed();
+  const death = chooseDeath?.(createSeededRng(seed)) ?? {
+    deathId: PLACEHOLDER_DEATH_ID,
+    zone: PLACEHOLDER_DEATH_ZONE,
+  };
+
   return {
-    seed: createSeed(),
+    seed,
     bets: bets.map((bet) => ({ ...bet })),
     victimId: victims[0]!,
     extraVictimIds: victims.slice(1),
-    deathId,
-    zone,
+    deathId: death.deathId,
+    zone: death.zone,
     mode,
     durationPreset,
   };

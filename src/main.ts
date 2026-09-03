@@ -14,8 +14,10 @@ import { setAudioEnabled } from '@/audio/AudioManager';
 import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
 import { createFsm, type GameState, type Transition } from '@/core/fsm';
-import { createSessionStore, resolveRound } from '@/core/session';
-import { arenaUpdateTimes, preloadArenaAssets } from '@/game/ArenaApp';
+import { createRoundSetup, createSessionStore, resolveRound } from '@/core/session';
+import { pickDeath } from '@/game/deaths/DeathSequence';
+import { registerAllDeaths } from '@/game/deaths';
+import { arenaLayout, arenaUpdateTimes, preloadArenaAssets } from '@/game/ArenaApp';
 import { confirmSheet } from '@/ui/components/sheet';
 import { showToast } from '@/ui/components/toast';
 import { setHapticsEnabled } from '@/ui/haptics';
@@ -46,10 +48,32 @@ setHapticsEnabled(settings.haptics);
 /* FSM                                                                 */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Die Registry muss stehen, bevor die erste Runde gezogen wird — sonst gäbe es beim
+ * Übergang BET→ARENA nichts auszuwählen.
+ */
+registerAllDeaths();
+
 const fsm = createFsm({
   players: session.activePlayers().map((player) => player.id),
   mode: settings.mode,
   durationPreset: settings.duration,
+
+  /**
+   * Die Ziehung des Opfers bleibt in `lottery.ts` (ADR-2). Hier kommt nur die
+   * **Inszenierung** dazu: welche Todesanimation gespielt wird. Sie hängt am Seed der
+   * Runde, nicht am sicheren Zufall — die Show soll reproduzierbar sein.
+   */
+  drawRound: (bets, mode, duration) =>
+    createRoundSetup(bets, mode, duration, (rng) => {
+      const recent = session.state.rounds.slice(-4).map((round) => round.deathId);
+      const sequence = pickDeath({
+        rng,
+        recent,
+        miracles: session.state.settings.miracles,
+      });
+      return { deathId: sequence.id, zone: sequence.zone };
+    }),
   ...(dev
     ? {
         onTransition: ({ from, to, event }: Transition) => {
@@ -220,7 +244,32 @@ async function registerServiceWorker(): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 applyStaticTranslations();
-void router.go(SCREEN_FOR_STATE[fsm.state]);
+
+/*
+ * `npm run preview:deaths` öffnet `?dev=1&panel=deaths`. Damit man die Sequenzen ansehen
+ * kann, ohne jedes Mal eine Runde durchzuklicken, springt die App dann direkt in die
+ * Arena: zwei Spieler, feste Einsätze, Show im Hold-Modus.
+ */
+function startDeathPreview(): boolean {
+  if (!dev || params.get('panel') !== 'deaths') return false;
+
+  session.ensureMinimumPlayers((index) => t('lobby.defaultName', { index }));
+  const players = session.activePlayers().map((player) => player.id);
+  if (players.length < 2) return false;
+
+  fsm.setPlayers(players);
+  fsm.send({ type: 'start' });
+  fsm.send({ type: 'begin' });
+  for (let i = 0; i < players.length; i++) {
+    fsm.send({ type: 'tap' });
+    fsm.send({ type: 'confirm', sips: 3 });
+  }
+  return true;
+}
+
+if (!startDeathPreview()) {
+  void router.go(SCREEN_FOR_STATE[fsm.state]);
+}
 void registerServiceWorker();
 
 if (dev) {
@@ -231,6 +280,8 @@ if (dev) {
       router,
       /** Von `perf.spec.ts` gelesen: reine JS-Zeit pro Frame (Architektur §7.10). */
       arenaUpdateTimes: () => arenaUpdateTimes(),
+      /** Aktuelle Arena-Geometrie — Werkzeuge schneiden Screenshots daraus zu. */
+      arenaLayout: () => arenaLayout(),
     },
   });
 }

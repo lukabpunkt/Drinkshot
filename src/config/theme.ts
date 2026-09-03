@@ -174,7 +174,7 @@ export const PARTICLE_BUDGET = {
   dirtFountain: { max: 14, lifeMs: 600 },
   feathersShards: { max: 8, lifeMs: 1200 },
   /** Harte Obergrenze aktiver Sprites in der Arena. */
-  maxActiveSprites: 150,
+  maxActiveSprites: 150 as number,
 } as const;
 
 /* ------------------------------------------------------------------ */

@@ -78,3 +78,15 @@ Kontext: Die Ziele der Panik-Beats liegen weitgehend fest (kein Ziel zweimal hin
 
 ## ADR-23 · 2026-09-03 · Perf-Tests brauchen eine GPU und sagen es sonst
 Kontext: Headless-Chromium rendert ohne GPU per SwiftShader in Software; die Arena lief dort mit 30 statt 60 fps. Das misst den Testrechner, nicht das Spiel. Entscheidung: Playwright startet Chromium mit GPU-Flags; `perf.spec.ts` liest den Renderer aus und überspringt die Frame-Zeit-Messung auf Software-Renderern mit klarer Begründung. Zusätzlich misst ein eigener Test die **reine JS-Zeit pro Frame** (Architektur §7.10) — die hängt nicht am Renderer und läuft überall. Konsequenz: Kein grüner Test, der nichts aussagt, und kein roter, der nur die Testmaschine anzeigt.
+
+## ADR-24 · 2026-09-03 · Sequenzen bekommen das Rig über ein eigenes Interface
+Kontext: Todesanimationen müssen Kopf, Arme, Hut und Overlays einzeln bewegen; alle Rig-Teile waren `private`. Entscheidung: Ein `ShotlingRig`-Interface gibt genau die Teile frei, die animiert werden dürfen, plus `setDriven()` (Automatik abschalten), `detachHat()` und `addOverlay()`. Konsequenz: Sequenzen können alles, was sie brauchen, aber nicht am Zustand des Shotlings schrauben — und `reset()` bleibt die eine Stelle, die alles zurückdreht.
+
+## ADR-25 · 2026-09-03 · Jede Sequenz endet über `finishDeath()`
+Kontext: Audit A4 verlangt von jeder der zwölf Animationen Grabstein-Pop und Nachbeben-Zoom. Zwölfmal kopiert wäre das zwölfmal eine Gelegenheit, es zu vergessen. Entscheidung: Ein gemeinsamer Abschluss in `fx/deathFinish.ts` setzt Grabstein, Nachbeben und die Reaktion der Umstehenden; die Timeline trägt danach eine Markierung. Konsequenz: Der Unit-Test prüft für jede Sequenz, dass sie den Abschluss benutzt — nicht nur, dass irgendwo ein Grabstein auftaucht.
+
+## ADR-26 · 2026-09-03 · Die Death-Auswahl kommt als Callback in `createRoundSetup`
+Kontext: Die Registry lebt in `game/`, die Runden-Erzeugung in `core/`. Ein Import von dort nach hier würde die Schichtung umdrehen. Entscheidung: `createRoundSetup(bets, mode, duration, chooseDeath?)` bekommt die Wahl als Funktion herein; `main.ts` reicht sie über den bestehenden `drawRound`-Seam der FSM. Der Seed entsteht zuerst, die Wahl läuft auf dem daraus abgeleiteten PRNG. Konsequenz: `core/` bleibt frei von `game/`, und dieselbe Runde lässt sich aus dem Seed identisch wiederholen.
+
+## ADR-27 · 2026-09-03 · Kontaktbögen statt Video als Animations-Beleg
+Kontext: Audit A4 nennt ein Video aller Tode als SOLL; im System gibt es keinen Encoder (kein `ffmpeg`). Entscheidung: Pro Sequenz ein Kontaktbogen aus acht Frames über die Laufzeit, nebeneinander montiert (`docs/screens/m4a-*.png`), aufgenommen aus der Death-Preview. Konsequenz: Zum Beurteilen sogar besser als ein Video, weil man die Key-Frames direkt vergleichen kann; ein Video bleibt für M6 möglich, wenn ein Encoder da ist.

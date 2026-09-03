@@ -1,22 +1,20 @@
 /**
- * `basic_fall` — der Platzhalter-Tod aus M3 (Roadmap M3.7).
+ * `basic_fall` — der schlichte Umfaller.
  *
- * Bewusst schlicht, aber vollständig nach den sieben Animationsprinzipien
- * (Art Direction §5.2), damit die zwölf echten Sequenzen in M4 ein Vorbild haben:
- * Anticipation, Squash & Stretch, Overshoot, Hit-Stop, Follow-Through, Lesbarkeit,
- * Sound-Sync.
+ * Vollständig nach den sieben Animationsprinzipien (Art Direction §5.2) und damit das
+ * Vorbild für alle anderen Sequenzen. Bleibt mit kleinem Gewicht im Pool, bis in M4c alle
+ * zwölf stehen — als ruhiger Kontrast zwischen den grösseren Gags.
  */
 
 import gsap from 'gsap';
-import { ANIM } from '@/config/theme';
 import { impactStars } from '../fx/MuzzleFlash';
-import { popTombstone } from '../fx/Tombstone';
+import { finishDeath, impactBeat } from '../fx/deathFinish';
 import type { DeathContext, DeathSequence } from './DeathSequence';
 
 export const basicFall: DeathSequence = {
   id: 'basic_fall',
   zone: 'body',
-  weight: 10,
+  weight: 3,
   needsSecondShot: false,
 
   build(ctx: DeathContext): gsap.core.Timeline {
@@ -30,18 +28,13 @@ export const basicFall: DeathSequence = {
     /* --- Hit-Stop: 80 ms Standbild auf dem Treffer-Frame --- */
     timeline.call(() => {
       victim.setState('dead');
+      victim.brain.stop();
       audio.play('hit_stop_thud');
       impactStars(fx.particles, { x, y: y - 120, power: 1 });
     });
-    timeline.to({}, { duration: ANIM.hitStopMs / 1000 });
 
     /* --- Squash & Stretch beim Aufprall des Impulses --- */
-    timeline.to(view.scale, {
-      x: view.scale.x * ANIM.squashScaleX,
-      y: view.scale.y * ANIM.squashScaleY,
-      duration: ANIM.squashMs / 1000,
-      ease: 'power2.out',
-    });
+    impactBeat(timeline, view);
 
     /* --- Anticipation: kurz gegen die Fallrichtung, dann umkippen --- */
     timeline.to(view, { rotation: 0.12, duration: 0.1, ease: 'power2.out' });
@@ -52,34 +45,26 @@ export const basicFall: DeathSequence = {
       onStart: () => audio.play('tree_fall'),
     });
 
-    /* --- Aufprall: nochmal squashen, Staub, Kamera-Wackler --- */
+    /* --- Aufprall: Staub, Kamera-Wackler --- */
     timeline.call(() => {
       audio.play('hit_stop_thud');
       fx.particles.emit('dust', x, y, 6, { speed: 150, gravity: -40, spread: Math.PI });
       camera.shakeScreen(160, 6);
     });
+    // Follow-Through: der Körper federt nach dem Aufprall noch einmal nach.
+    timeline.to(view.scale, {
+      x: view.scale.x * 1.06,
+      y: view.scale.y * 0.94,
+      duration: 0.08,
+      ease: 'power2.out',
+    });
     timeline.to(view.scale, {
       x: view.scale.x,
       y: view.scale.y,
-      duration: 0.22,
+      duration: 0.24,
       ease: 'elastic.out(1, 0.45)',
     });
 
-    /* --- Follow-Through: der Grabstein kommt später als der Körper --- */
-    timeline.call(
-      () => {
-        audio.play('rip_pop');
-        const { timeline: pop } = popTombstone(fx.overlay, x + 60, y, victim.view.scale.x * 1.4);
-        timeline.add(pop, '>');
-      },
-      undefined,
-      '+=0.15'
-    );
-
-    /* --- Nachbeben: Kamera zoomt sanft auf das Opfer --- */
-    timeline.call(() => camera.afterShock());
-    timeline.to({}, { duration: 0.5 });
-
-    return timeline;
+    return finishDeath(ctx, timeline, { x, y, delayMs: 150 });
   },
 };

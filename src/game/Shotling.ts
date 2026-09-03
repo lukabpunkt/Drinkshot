@@ -55,6 +55,29 @@ const ARM_REST = 0.2;
 const STRIDE = 62;
 const SHADOW_ALPHA = 0.35;
 
+/**
+ * Die Teile, die eine Todesanimation bewegen darf.
+ *
+ * Bewusst als eigenes Interface statt `public`-Felder: Sequenzen sollen animieren, aber
+ * nicht am Zustand des Shotlings schrauben. Was hier nicht steht, gehört dem Shotling.
+ */
+export interface ShotlingRig {
+  /** Alles ausser dem Schatten — kippt und taumelt als Ganzes. */
+  readonly body: Container;
+  /** Kopf mit Gesicht und Hut; dreht sich unabhängig vom Körper. */
+  readonly head: Container;
+  readonly torso: Sprite;
+  readonly armL: Sprite;
+  readonly armR: Sprite;
+  readonly legL: Sprite;
+  readonly legR: Sprite;
+  readonly footL: Sprite;
+  readonly footR: Sprite;
+  readonly face: Sprite;
+  readonly hat: Sprite;
+  readonly shadow: Sprite;
+}
+
 export interface ShotlingOptions {
   sheet: Spritesheet;
   colorId: ColorId;
@@ -97,6 +120,18 @@ export class Shotling {
    */
   readonly aimPoint: { readonly x: number; readonly y: number };
   private readonly aimOffsetY: number;
+  /** Ruhe-Skalierung des Rigs — `reset()` stellt sie wieder her. */
+  private readonly baseScale: number;
+
+  /** Overlays (Skelett, Eis) — werden bei `reset()` wieder abgeräumt. */
+  private readonly overlays: Sprite[] = [];
+  /**
+   * Solange `true`, hält sich `update()` komplett heraus: keine Positions-Übernahme vom
+   * Brain, kein Walk-Cycle. Eine Sequenz, die das Männchen durch die Arena fliegen lässt,
+   * würde sonst jeden Frame vom Brain zurückgezogen.
+   */
+  private driven = false;
+  private detachedHat: Container | undefined;
 
   private faceId: FaceId = 'neutral';
   private hatId: HatId;
@@ -163,7 +198,8 @@ export class Shotling {
     );
 
     this.view.addChild(this.shadow, this.body);
-    this.view.scale.set(rigScaleFor(options.height ?? shotlingHeightFor(8)));
+    this.baseScale = rigScaleFor(options.height ?? shotlingHeightFor(8));
+    this.view.scale.set(this.baseScale);
 
     const height = options.height ?? shotlingHeightFor(8);
     this.aimOffsetY = height * 0.58;
@@ -272,21 +308,135 @@ export class Shotling {
     this.shadow.visible = !low;
   }
 
-  /** Setzt das Rig auf die Ausgangspose zurueck (nach einer Todesanimation, M4). */
+  /**
+   * Setzt das Rig auf die Ausgangspose zurück.
+   *
+   * Audit A4 prüft genau das: Nach einer Sequenz plus `reset()` muss der Shotling wieder
+   * `idle` sein — sonst schleppt die nächste Runde einen halb umgekippten Körper mit.
+   * Deshalb wird hier jedes Teil angefasst, nicht nur die, die `basic_fall` bewegt.
+   */
   reset(): void {
+    this.driven = false;
+
+    for (const overlay of this.overlays) overlay.destroy();
+    this.overlays.length = 0;
+
+    // Einen weggeflogenen Hut zurück an den Kopf holen.
+    if (this.detachedHat) {
+      this.head.addChild(this.hat);
+      this.detachedHat = undefined;
+    }
+    this.hat.position.set(0, RIG.hat.y - RIG.head.y);
+    this.hat.rotation = 0;
+    this.hat.alpha = 1;
+    this.hat.scale.set(1);
+    this.hat.visible = this.hatId !== 'none';
+
+    this.view.position.set(this.brain.x, this.brain.y);
+    this.view.rotation = 0;
+    this.view.alpha = 1;
+    /*
+     * Die Skalierung gehört zwingend dazu: `body_deflate` schrumpft das ganze Rig,
+     * `body_freeze_shatter` lässt es verschwinden. Ohne diese Zeile bliebe das Männchen
+     * für den Rest der Session platt — und zwar lautlos.
+     */
+    this.view.scale.set(this.baseScale);
+
     this.body.position.set(0, 0);
     this.body.rotation = 0;
     this.body.scale.set(1);
-    this.view.rotation = 0;
-    this.view.alpha = 1;
+    this.body.alpha = 1;
+
     this.torso.scale.set(1);
+    this.torso.rotation = 0;
+    this.torso.alpha = 1;
+
     this.head.rotation = 0;
+    this.head.scale.set(1);
+    this.head.alpha = 1;
     this.head.position.set(RIG.head.x, RIG.head.y);
+
     this.armL.rotation = ARM_REST;
     this.armR.rotation = -ARM_REST;
-    this.state = 'walk';
+    this.legL.rotation = 0;
+    this.legR.rotation = 0;
+    this.footL.position.set(-RIG.foot.x, RIG.foot.y);
+    this.footR.position.set(RIG.foot.x, RIG.foot.y);
+
+    this.shadow.alpha = SHADOW_ALPHA;
+    this.shadow.scale.set(1);
+    this.shadow.visible = !this.lowEffects;
+
+    this.state = 'idle';
     this.brain.state = 'walk';
     this.setFace('neutral');
+  }
+
+  /**
+   * Textur aus dem Shotling-Atlas — Sequenzen holen sich darüber Skelett, Eis und
+   * Scherben, ohne den Spritesheet selbst herumreichen zu müssen.
+   */
+  textureFor(frame: string): Texture {
+    return this.texture(frame);
+  }
+
+  /** Zugriff für Todesanimationen (Architektur §6). */
+  get rig(): ShotlingRig {
+    return {
+      body: this.body,
+      head: this.head,
+      torso: this.torso,
+      armL: this.armL,
+      armR: this.armR,
+      legL: this.legL,
+      legR: this.legR,
+      footL: this.footL,
+      footR: this.footR,
+      face: this.face,
+      hat: this.hat,
+      shadow: this.shadow,
+    };
+  }
+
+  /** Übergibt die Kontrolle an eine Sequenz (siehe `driven`). */
+  setDriven(driven: boolean): void {
+    this.driven = driven;
+  }
+
+  isDriven(): boolean {
+    return this.driven;
+  }
+
+  /** Grösse des Rigs in Welteinheiten — Sequenzen rechnen Flughöhen daraus. */
+  get height(): number {
+    return RIG.height * this.view.scale.y;
+  }
+
+  /**
+   * Hängt den Hut an einen anderen Container um, damit er unabhängig vom Kopf fliegen
+   * kann. Die Weltposition bleibt erhalten. Gibt `null` zurück, wenn kein Hut da ist.
+   */
+  detachHat(target: Container): Sprite | null {
+    if (this.hatId === 'none' || !this.hat.visible) return null;
+    const global = this.hat.getGlobalPosition();
+    this.detachedHat = target;
+    target.addChild(this.hat);
+    this.hat.position.copyFrom(target.toLocal(global));
+    this.hat.scale.set(this.view.scale.x, this.view.scale.y);
+    return this.hat;
+  }
+
+  /**
+   * Legt ein Sprite deckungsgleich über den Körper — Skelett-Silhouette, Eisblock.
+   * Wird bei `reset()` mitentfernt.
+   */
+  addOverlay(texture: Texture, options: { anchorY?: number; y?: number } = {}): Sprite {
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5, options.anchorY ?? 1);
+    sprite.position.set(0, options.y ?? 0);
+    this.body.addChild(sprite);
+    this.overlays.push(sprite);
+    return sprite;
   }
 
   destroy(): void {
@@ -298,6 +448,8 @@ export class Shotling {
   /* ------------------------------------------------------------------ */
 
   update(dtMs: number): void {
+    // Während eine Sequenz das Rig steuert, hält sich die Automatik komplett heraus.
+    if (this.driven) return;
     this.syncPosition();
     this.updateBlink(dtMs);
     this.updateWalkCycle();

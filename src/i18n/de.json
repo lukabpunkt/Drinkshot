@@ -152,5 +152,11 @@
   "error": {
     "generic": "Da ist was schiefgelaufen.",
     "retry": "Nochmal versuchen"
+  },
+  "deaths": {
+    "notYet": "Noch nicht!",
+    "ouch": "Aua!",
+    "whyMe": "Warum ich?!",
+    "phew": "Puh!"
   }
 }

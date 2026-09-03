@@ -163,7 +163,9 @@ test.describe('Arena-Performance', () => {
     await enterArena(page);
 
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-    await page.waitForTimeout(6000);
+    // 8 s statt 6: Ein Runner ohne GPU schafft unter 4-facher Drosselung keine 10 fps,
+    // und die Anzahl der Messwerte hängt an der Bildrate der Testmaschine.
+    await page.waitForTimeout(8000);
     const times = await page.evaluate(() => {
       const scope = window as unknown as {
         drinkshot?: { arenaUpdateTimes?: () => number[] };
@@ -172,7 +174,8 @@ test.describe('Arena-Performance', () => {
     });
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
-    expect(times.length, 'keine Update-Zeiten gemessen').toBeGreaterThan(60);
+    // Die Aussage steckt im p95, nicht in der Stichprobengrösse — 20 Frames reichen dafür.
+    expect(times.length, 'keine Update-Zeiten gemessen').toBeGreaterThan(20);
     const sorted = [...times].sort((a, b) => a - b);
     const p50 = percentile(sorted, 0.5);
     const p95 = percentile(sorted, 0.95);

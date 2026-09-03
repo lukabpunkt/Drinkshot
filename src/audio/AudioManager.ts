@@ -27,6 +27,8 @@ export type AudioCue =
   | 'lock_engage'
   | 'gunshot'
   | 'hit_stop_thud'
+  | 'ice_crack'
+  | 'xray_zap'
   | 'star_twinkle'
   | 'balloon_deflate'
   | 'tree_fall'
@@ -66,6 +68,8 @@ const CUES: Record<AudioCue, CueSpec> = {
   lock_engage: { freq: 220, sweepTo: 90, durationMs: 320, wave: 'sawtooth', gain: 0.2, lowpass: 900 },
   gunshot: { freq: 90, sweepTo: 40, durationMs: 300, wave: 'sawtooth', gain: 0.5, noise: 0.9, lowpass: 2600 },
   hit_stop_thud: { freq: 130, sweepTo: 60, durationMs: 160, wave: 'sine', gain: 0.34, noise: 0.25, lowpass: 700 },
+  ice_crack: { freq: 2400, sweepTo: 900, durationMs: 240, wave: 'square', gain: 0.2, noise: 0.75, lowpass: 6000 },
+  xray_zap: { freq: 1200, sweepTo: 3200, durationMs: 180, wave: 'sawtooth', gain: 0.18, noise: 0.35 },
   star_twinkle: { freq: 1760, sweepTo: 2640, durationMs: 200, wave: 'sine', gain: 0.12 },
   balloon_deflate: { freq: 800, sweepTo: 240, durationMs: 900, wave: 'sawtooth', gain: 0.16, noise: 0.7, lowpass: 3000 },
   tree_fall: { freq: 260, sweepTo: 70, durationMs: 620, wave: 'sawtooth', gain: 0.24, noise: 0.35, lowpass: 1100 },

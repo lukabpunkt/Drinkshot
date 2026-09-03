@@ -152,5 +152,11 @@
   "error": {
     "generic": "Something went wrong.",
     "retry": "Try again"
+  },
+  "deaths": {
+    "notYet": "Not yet!",
+    "ouch": "Ouch!",
+    "whyMe": "Why me?!",
+    "phew": "Phew!"
   }
 }

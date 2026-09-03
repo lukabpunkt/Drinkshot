@@ -5,47 +5,48 @@
  * Atlas-Umlauf und hält die Form an einer Stelle änderbar.
  */
 
-import type { Container} from 'pixi.js';
-import { Sprite, Texture } from 'pixi.js';
+import type { Container, Texture } from 'pixi.js';
+import { Sprite } from 'pixi.js';
 import gsap from 'gsap';
 import { MOTION, UI_COLORS, hex } from '@/config/theme';
+import { createCanvasTexture } from './canvasTexture';
+
+/** Alle von Sequenzen erzeugten Requisiten tragen dieses Label. */
+export const DEATH_PROP_LABEL = 'death-prop';
 
 let cached: Texture | undefined;
 
 function tombstoneTexture(): Texture {
-  if (cached) return cached;
+  const existing = cached;
+  if (existing) return existing;
 
-  const width = 96;
-  const height = 120;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const texture = createCanvasTexture({
+    width: 96,
+    height: 120,
+    draw: (ctx, width, height) => {
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 9;
+      ctx.strokeStyle = hex(UI_COLORS.ink);
+      ctx.fillStyle = '#C9CEDA';
 
-  if (ctx) {
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 9;
-    ctx.strokeStyle = hex(UI_COLORS.ink);
-    ctx.fillStyle = '#C9CEDA';
+      ctx.beginPath();
+      ctx.moveTo(12, height - 8);
+      ctx.lineTo(12, 46);
+      ctx.arc(width / 2, 46, width / 2 - 12, Math.PI, 0);
+      ctx.lineTo(width - 12, height - 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(12, height - 8);
-    ctx.lineTo(12, 46);
-    ctx.arc(width / 2, 46, width / 2 - 12, Math.PI, 0);
-    ctx.lineTo(width - 12, height - 8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // "RIP" als Balken statt als Text — sprachneutral und ohne Font-Abhängigkeit.
-    ctx.fillStyle = hex(UI_COLORS.ink);
-    ctx.fillRect(30, 44, 36, 8);
-    ctx.fillRect(30, 60, 36, 8);
-    ctx.fillRect(30, 76, 22, 8);
-  }
-
-  cached = Texture.from(canvas);
-  return cached;
+      // "RIP" als Balken statt als Text — sprachneutral und ohne Font-Abhängigkeit.
+      ctx.fillStyle = hex(UI_COLORS.ink);
+      ctx.fillRect(30, 44, 36, 8);
+      ctx.fillRect(30, 60, 36, 8);
+      ctx.fillRect(30, 76, 22, 8);
+    },
+  });
+  cached = texture;
+  return texture;
 }
 
 /**
@@ -59,6 +60,8 @@ export function popTombstone(
   scale = 1
 ): { sprite: Sprite; timeline: gsap.core.Timeline } {
   const sprite = new Sprite(tombstoneTexture());
+  // Markiert, damit eine erneute Vorführung die Requisiten der letzten abräumen kann.
+  sprite.label = DEATH_PROP_LABEL;
   sprite.anchor.set(0.5, 1);
   sprite.position.set(x, y);
   sprite.scale.set(scale * 0.2);

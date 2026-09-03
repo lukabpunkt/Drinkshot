@@ -274,6 +274,11 @@ export function arenaUpdateTimes(): readonly number[] {
   return handle?.updateTimes() ?? [];
 }
 
+/** Aktuelle Welt-Transformation — Testwerkzeuge leiten daraus Bildausschnitte ab. */
+export function arenaLayout(): ArenaAppHandle['layout'] | undefined {
+  return handle?.layout;
+}
+
 /** Nur für Tests: gibt den Singleton frei. */
 export function resetArenaApp(): void {
   handle?.destroy();

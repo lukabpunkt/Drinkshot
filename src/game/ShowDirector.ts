@@ -229,7 +229,10 @@ export class ShowDirector {
                 scope,
                 camera,
                 fx: { particles, overlay: this.options.arena.actorLayer },
-                audio: { play: (cue) => audio.play(cue as audio.AudioCue) },
+                audio: {
+                  play: (cue, when, detune) =>
+                    audio.play(cue as audio.AudioCue, when, detune),
+                },
                 rng: this.options.rng,
                 arena: this.options.arena,
               });

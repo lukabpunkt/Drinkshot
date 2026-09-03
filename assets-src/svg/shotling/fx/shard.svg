@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Eis-Scherbe fuer body_freeze_shatter. Wird gedreht und skaliert vervielfaeltigt. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+  <path d="M36 4 L66 42 L28 68 L6 30 Z"
+        fill="#BFE7FF" stroke="#1A1024" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M30 18 L44 44" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+</svg>

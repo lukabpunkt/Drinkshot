@@ -7,8 +7,9 @@
 
 import { Container, Sprite, Texture } from 'pixi.js';
 import { PARTICLE_BUDGET, UI_COLORS } from '@/config/theme';
+import { createCanvasTexture } from './canvasTexture';
 
-export type ParticleKind = 'star' | 'dust' | 'smoke' | 'dirt';
+export type ParticleKind = 'star' | 'dust' | 'smoke' | 'dirt' | 'shard' | 'feather';
 
 interface Particle {
   sprite: Sprite;
@@ -26,56 +27,101 @@ interface Particle {
  * Partikel echte Formen haben (ein getintetes `Texture.WHITE` wäre ein Quadrat) und
  * trotzdem alle in denselben Batch fallen.
  */
-function makeTexture(draw: (ctx: CanvasRenderingContext2D, size: number) => void, size = 64): Texture {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d');
-  if (context) draw(context, size);
-  return Texture.from(canvas);
-}
-
 function starTexture(): Texture {
-  return makeTexture((ctx, size) => {
-    const c = size / 2;
-    const outer = size * 0.44;
-    const inner = outer * 0.45;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const radius = i % 2 === 0 ? outer : inner;
-      const angle = (Math.PI / 5) * i - Math.PI / 2;
-      const x = c + Math.cos(angle) * radius;
-      const y = c + Math.sin(angle) * radius;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.lineWidth = size * 0.09;
-    ctx.strokeStyle = '#1A1024';
-    ctx.stroke();
+  return createCanvasTexture({
+    width: 64,
+    height: 64,
+    draw: (ctx, size) => {
+      const c = size / 2;
+      const outer = size * 0.44;
+      const inner = outer * 0.45;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const radius = i % 2 === 0 ? outer : inner;
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const x = c + Math.cos(angle) * radius;
+        const y = c + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = size * 0.09;
+      ctx.strokeStyle = '#1A1024';
+      ctx.stroke();
+    },
   });
 }
 
 function softCircleTexture(): Texture {
-  return makeTexture((ctx, size) => {
-    const c = size / 2;
-    const gradient = ctx.createRadialGradient(c, c, 0, c, c, c);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.6, 'rgba(255,255,255,0.85)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
+  return createCanvasTexture({
+    width: 64,
+    height: 64,
+    draw: (ctx, size) => {
+      const c = size / 2;
+      const gradient = ctx.createRadialGradient(c, c, 0, c, c, c);
+      gradient.addColorStop(0, 'rgba(255,255,255,1)');
+      gradient.addColorStop(0.6, 'rgba(255,255,255,0.85)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+    },
   });
 }
 
 function solidCircleTexture(): Texture {
-  return makeTexture((ctx, size) => {
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size * 0.42, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
+  return createCanvasTexture({
+    width: 64,
+    height: 64,
+    draw: (ctx, size) => {
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    },
+  });
+}
+
+/** Eis-Scherbe: unregelmässiges Dreieck mit ink-Kante. */
+function shardTexture(): Texture {
+  return createCanvasTexture({
+    width: 64,
+    height: 64,
+    draw: (ctx, size) => {
+      ctx.beginPath();
+      ctx.moveTo(size * 0.5, size * 0.08);
+      ctx.lineTo(size * 0.88, size * 0.62);
+      ctx.lineTo(size * 0.34, size * 0.92);
+      ctx.lineTo(size * 0.12, size * 0.44);
+      ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = size * 0.08;
+      ctx.strokeStyle = '#1A1024';
+      ctx.stroke();
+    },
+  });
+}
+
+/** Feder: schmales Blatt mit Kiel. */
+function featherTexture(): Texture {
+  return createCanvasTexture({
+    width: 64,
+    height: 64,
+    draw: (ctx, size) => {
+      ctx.beginPath();
+      ctx.ellipse(size / 2, size / 2, size * 0.16, size * 0.42, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = size * 0.06;
+      ctx.strokeStyle = '#1A1024';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(size / 2, size * 0.1);
+      ctx.lineTo(size / 2, size * 0.9);
+      ctx.stroke();
+    },
   });
 }
 
@@ -84,6 +130,8 @@ const MAX_BY_KIND: Record<ParticleKind, number> = {
   dust: PARTICLE_BUDGET.runDust.maxPerShotling * 8,
   smoke: PARTICLE_BUDGET.smokePuff.max,
   dirt: PARTICLE_BUDGET.dirtFountain.max,
+  shard: PARTICLE_BUDGET.feathersShards.max,
+  feather: PARTICLE_BUDGET.feathersShards.max,
 };
 
 const LIFE_BY_KIND: Record<ParticleKind, number> = {
@@ -91,6 +139,8 @@ const LIFE_BY_KIND: Record<ParticleKind, number> = {
   dust: PARTICLE_BUDGET.runDust.lifeMs,
   smoke: PARTICLE_BUDGET.smokePuff.lifeMs,
   dirt: PARTICLE_BUDGET.dirtFountain.lifeMs,
+  shard: PARTICLE_BUDGET.feathersShards.lifeMs,
+  feather: PARTICLE_BUDGET.feathersShards.lifeMs,
 };
 
 const TINT_BY_KIND: Record<ParticleKind, number> = {
@@ -98,6 +148,8 @@ const TINT_BY_KIND: Record<ParticleKind, number> = {
   dust: 0xffffff,
   smoke: 0xcfd3dd,
   dirt: UI_COLORS.arenaGrassDark,
+  shard: UI_COLORS.scopeGlass,
+  feather: UI_COLORS.paper,
 };
 
 const SIZE_BY_KIND: Record<ParticleKind, number> = {
@@ -105,6 +157,8 @@ const SIZE_BY_KIND: Record<ParticleKind, number> = {
   dust: 14,
   smoke: 34,
   dirt: 12,
+  shard: 22,
+  feather: 18,
 };
 
 export class ParticlePool {
@@ -122,6 +176,8 @@ export class ParticlePool {
       dust: soft,
       smoke: soft,
       dirt: solidCircleTexture(),
+      shard: shardTexture(),
+      feather: featherTexture(),
     };
 
     for (let i = 0; i < capacity; i++) {

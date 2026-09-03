@@ -22,6 +22,9 @@ export interface DevPanelOptions {
   onLowEffectsChange: (value: boolean) => void;
   /** Spielt die aktuelle Show noch einmal ab (M3). */
   onReplay?: () => void;
+  /** Death-Preview (Architektur §9): Sequenz auswählen und sofort abspielen. */
+  deathIds?: readonly string[];
+  onPlayDeath?: (id: string) => void;
   /** Audit A3: Filter dürfen ausserhalb von Lock/Shot nicht aktiv sein. */
   hasFilters?: () => boolean;
 }
@@ -67,6 +70,31 @@ export function createDevPanel(options: DevPanelOptions): DevPanel {
     replay.textContent = 'Show erneut abspielen';
     replay.addEventListener('click', () => options.onReplay?.());
     controls.append(replay);
+  }
+
+  /* --- Death-Preview: jede Sequenz einzeln ansehen, ohne eine Runde zu spielen --- */
+  if (options.deathIds && options.onPlayDeath) {
+    const row = document.createElement('div');
+    row.className = 'dev__row';
+
+    const select = document.createElement('select');
+    select.className = 'dev__select';
+    for (const id of options.deathIds) {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = id;
+      select.append(option);
+    }
+
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'dev__button';
+    play.textContent = '▶';
+    play.title = 'Sequenz abspielen';
+    play.addEventListener('click', () => options.onPlayDeath?.(select.value));
+
+    row.append(select, play);
+    controls.append(row);
   }
   el.append(stats, controls);
   options.host.append(el);

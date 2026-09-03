@@ -5,6 +5,7 @@
  * BET→ARENA fest (ADR-2). Hier wird das `ShowScript` daraus erzeugt und abgespielt.
  */
 
+import gsap from 'gsap';
 import { ARENA, shotlingHeightFor } from '@/config/theme';
 import { buildShowScript } from '@/core/choreographer';
 import { createSeededRng } from '@/core/rng';
@@ -29,13 +30,27 @@ import { Shotling } from '@/game/Shotling';
 import { resolveOverlaps, ShotlingBrain } from '@/game/ShotlingBrain';
 import { ShowDirector } from '@/game/ShowDirector';
 import { ParticlePool } from '@/game/fx/ParticlePool';
+import { clearDeathProps } from '@/game/fx/deathFinish';
 import { registerAllDeaths } from '@/game/deaths';
+import { allDeaths, getDeath } from '@/game/deaths/DeathSequence';
 import { createDevPanel, type DevPanel } from '@/ui/components/devPanel';
 
 /** `?dev=1&hold=1` hält die Arena offen, damit `perf.spec.ts` messen kann. */
 function isHoldMode(dev: boolean): boolean {
   if (!dev) return false;
-  return new URLSearchParams(globalThis.location?.search ?? '').get('hold') === '1';
+  const params = new URLSearchParams(globalThis.location?.search ?? '');
+  // Die Death-Preview hält die Arena immer offen — sonst wäre sie nach einer Sequenz weg.
+  return params.get('hold') === '1' || isDeathPreview(dev);
+}
+
+/**
+ * `?dev=1&panel=deaths`: Nur die Arena, **ohne** die automatische Show. Sonst liefen zwei
+ * Todesanimationen gleichzeitig — die des Drehbuchs und die aus dem Dropdown — und man
+ * beurteilte die falsche.
+ */
+function isDeathPreview(dev: boolean): boolean {
+  if (!dev) return false;
+  return new URLSearchParams(globalThis.location?.search ?? '').get('panel') === 'deaths';
 }
 
 /**
@@ -265,7 +280,9 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     });
 
     // LOCK-Schriftzug einblenden, wenn der Lock-Beat kommt.
-    const lockBeat = script.beats.find((beat) => beat.type === 'lock');
+    const lockBeat = isDeathPreview(ctx.dev)
+      ? undefined
+      : script.beats.find((beat) => beat.type === 'lock');
     if (lockBeat) {
       globalThis.setTimeout(() => {
         if (!disposed && !finished) lockLabel.hidden = false;
@@ -280,12 +297,64 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     document.addEventListener('visibilitychange', onVisibility);
 
     if (ctx.dev) {
+      /**
+       * Death-Preview (Architektur §9): baut die gewählte Sequenz auf dem Opfer neu auf.
+       * Vorher wird das Rig zurückgesetzt — sonst stapeln sich zwei Animationen auf
+       * demselben Körper, und man sieht nicht mehr, welche man gerade beurteilt.
+       */
+      const playDeath = (id: string): void => {
+        const sequence = getDeath(id);
+        // Immer dasselbe Opfer, damit sich zwei Durchläufe vergleichen lassen.
+        const target = [...shotlings.values()][0];
+        if (!sequence || !target || !scope || !camera || !particles) return;
+
+        gsap.killTweensOf(target.view);
+        target.reset();
+        particles.clear();
+        clearDeathProps(arena.actorLayer);
+
+        const rest = [...shotlings.values()].filter((other) => other !== target);
+        for (const other of rest) other.reset();
+
+        /*
+         * Bühne freiräumen: Das Opfer in die Mitte, die anderen an den Rand. Sonst steht
+         * die Sequenz, die man beurteilen will, hinter einem anderen Männchen.
+         */
+        target.brain.x = arena.centerX;
+        target.brain.y = arena.centerY;
+        target.brain.stop();
+        rest.forEach((other, index) => {
+          const angle = Math.PI * 0.5 + (index / Math.max(1, rest.length)) * Math.PI * 1.5;
+          other.brain.x = arena.centerX + Math.cos(angle) * arena.walkRadius * 0.85;
+          other.brain.y = arena.centerY + Math.sin(angle) * arena.walkRadius * 0.85;
+          other.brain.stop();
+          other.update(0);
+        });
+        target.update(0);
+        scope.snapTo(target.aimPoint);
+
+        sequence
+          .build({
+            victim: target,
+            others: rest,
+            scope,
+            camera,
+            fx: { particles, overlay: arena.actorLayer },
+            audio: { play: (cue, when, detune) => audio.play(cue as audio.AudioCue, when, detune) },
+            rng: createSeededRng(round.seed),
+            arena,
+          })
+          .play();
+      };
+
       devPanel = createDevPanel({
         host: el,
         app: handle,
         initialCount: shotlings.size,
         lowEffects,
         seed: round.seed,
+        deathIds: allDeaths().map((sequence) => sequence.id),
+        onPlayDeath: playDeath,
         onSpeedChange: (multiplier) => {
           for (const brain of brains) brain.speedMultiplier = multiplier;
         },
@@ -299,7 +368,8 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       });
     }
 
-    director.play();
+    // In der Death-Preview startet nichts von allein — das Dropdown gibt den Takt vor.
+    if (!isDeathPreview(ctx.dev)) director.play();
   }
 
   return {

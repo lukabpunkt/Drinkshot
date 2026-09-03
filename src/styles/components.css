@@ -1395,6 +1395,17 @@
   accent-color: var(--c-accent);
 }
 
+.dev__select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 4px;
+  border: 1px solid rgb(255 248 231 / 25%);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-deep);
+  color: var(--c-paper);
+  font-size: 11px;
+}
+
 .dev__button {
   min-height: 30px;
   padding: 0 var(--space-2);

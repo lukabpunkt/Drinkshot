@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Skelett-Silhouette fuer head_xray. Deckt die Rig-Silhouette; wird NICHT getintet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 280" width="140" height="280">
+  <g fill="#FFF8E7" stroke="#1A1024" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Schaedel mit Augenhoehlen -->
+    <ellipse cx="70" cy="64" rx="46" ry="44"/>
+    <ellipse cx="52" cy="60" rx="13" ry="15" fill="#1A1024" stroke="none"/>
+    <ellipse cx="88" cy="60" rx="13" ry="15" fill="#1A1024" stroke="none"/>
+    <path d="M62 92 h16" stroke="#1A1024" stroke-width="6"/>
+    <!-- Wirbelsaeule -->
+    <path d="M70 108 V176" stroke="#1A1024" stroke-width="10" fill="none"/>
+    <!-- Rippen -->
+    <path d="M42 124 H98 M40 144 H100 M44 164 H96" stroke="#1A1024" stroke-width="8" fill="none"/>
+    <!-- Becken -->
+    <path d="M46 178 h48 l-8 22 h-32 z"/>
+    <!-- Arme -->
+    <path d="M40 118 L18 168" stroke="#1A1024" stroke-width="9" fill="none"/>
+    <path d="M100 118 L122 168" stroke="#1A1024" stroke-width="9" fill="none"/>
+    <!-- Beine -->
+    <path d="M58 200 L52 262" stroke="#1A1024" stroke-width="11" fill="none"/>
+    <path d="M82 200 L88 262" stroke="#1A1024" stroke-width="11" fill="none"/>
+  </g>
+</svg>

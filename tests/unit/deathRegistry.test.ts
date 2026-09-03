@@ -60,17 +60,19 @@ describe('Registry', () => {
 
   it('registerAllDeaths ist idempotent', () => {
     registerAllDeaths();
+    const first = allDeaths().length;
     registerAllDeaths();
-    expect(allDeaths().map((d) => d.id)).toEqual(['basic_fall']);
+    expect(allDeaths()).toHaveLength(first);
   });
 
-  it('basic_fall ist vollständig beschrieben', () => {
+  it('jede Sequenz ist vollständig beschrieben', () => {
     registerAllDeaths();
-    const sequence = getDeath('basic_fall');
-    expect(sequence).toBeDefined();
-    expect(DEATH_ZONES).toContain(sequence!.zone);
-    expect(sequence!.weight).toBeGreaterThan(0);
-    expect(typeof sequence!.needsSecondShot).toBe('boolean');
+    for (const sequence of allDeaths()) {
+      expect(DEATH_ZONES, sequence.id).toContain(sequence.zone);
+      expect(sequence.weight, sequence.id).toBeGreaterThan(0);
+      expect(typeof sequence.needsSecondShot, sequence.id).toBe('boolean');
+      expect(typeof sequence.build, sequence.id).toBe('function');
+    }
   });
 });
 
@@ -157,10 +159,38 @@ describe(`No-Repeat-Fenster ${DEATH_NO_REPEAT_WINDOW}`, () => {
   });
 });
 
-describe('Vollständigkeit (M4)', () => {
+describe('Vollständigkeit', () => {
+  /*
+   * Dauer, Endzustand und Reset prüft `deaths.test.ts` pro Sequenz — dort steht der
+   * Harness mit echtem Rig. Hier bleibt, was die Registry als Ganzes betrifft.
+   */
+  it('registriert Kopf- und Brust-Zone vollständig (M4a)', () => {
+    registerAllDeaths();
+    const byZone = new Map<string, string[]>();
+    for (const sequence of allDeaths()) {
+      byZone.set(sequence.zone, [...(byZone.get(sequence.zone) ?? []), sequence.id]);
+    }
+    expect(byZone.get('head')?.sort()).toEqual([
+      'head_hat_launch',
+      'head_helmet_spin',
+      'head_xray',
+    ]);
+    expect(byZone.get('body')?.sort()).toEqual([
+      'basic_fall',
+      'body_deflate',
+      'body_dramatic',
+      'body_freeze_shatter',
+    ]);
+  });
+
+  it('jede registrierte Sequenz hat ein positives Gewicht', () => {
+    registerAllDeaths();
+    for (const sequence of allDeaths()) {
+      expect(sequence.weight, sequence.id).toBeGreaterThan(0);
+    }
+  });
+
+  it.todo('M4b: leg_hop, leg_spin, butt_rocket, butt_hotfoot, miss_then_hit');
+  it.todo('M4c: miracle_dodge samt Session-Regel und Result-Feier');
   it.todo('alle 12 DeathIds aus GDD §4.1 sind registriert');
-  it.todo('jede Sequenz dauert 1.5–4.5 s');
-  it.todo('jede Sequenz endet mit victim.state === "dead" (außer miracle)');
-  it.todo('nach Sequenz + Reset ist der Shotling wieder "idle"');
-  it.todo('zu jeder Zone existiert ein Icon und ein Zonen-Text');
 });

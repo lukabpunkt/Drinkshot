@@ -8,8 +8,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
-/** Die Show dauert 15 s plus Todesanimation und Wipes — großzügig gemessen. */
-const ARENA_TIMEOUT = 30_000;
+/**
+ * Die Show dauert 15 s plus Todesanimation und Wipes. Auf einem Runner ohne GPU klemmt
+ * PIXI lange Frames ab und die Show läuft gedehnt — deshalb reichlich Luft.
+ */
+const ARENA_TIMEOUT = 60_000;
 
 /** Sammelt Console-Errors; A1 fordert einen Flow ohne sie. */
 function watchErrors(page: Page): string[] {
@@ -75,7 +78,7 @@ async function playRound(page: Page, bets: number[]): Promise<void> {
 test('kompletter Flow: 4 Spieler, 2 Runden', async ({ page }) => {
   // Zwei volle Runden mit je 15 s Show, 8 Wipes und 8 Screens — der Test ist absichtlich
   // langsam, weil er das echte Timing mitläuft.
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const errors = watchErrors(page);
   await freshStart(page);
 

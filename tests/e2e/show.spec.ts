@@ -9,13 +9,30 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /*
- * Nacheinander laufen lassen: Diese Tests messen echte Wartezeiten einer 10–22 s langen
- * Show. Parallel laufende Shows nehmen sich gegenseitig die CPU weg und verschieben die
- * gemessenen Dauern — dieselbe Falle wie bei den Perf-Tests.
+ * Reihenfolge ist hier Teil der Aussage: Diese Tests messen echte Wartezeiten einer
+ * 10–22 s langen Show. Der Runner läuft ohnehin mit einem Worker (playwright.config.ts),
+ * `serial` hält es auch dann, wenn jemand die Konfiguration ändert.
  */
 test.describe.configure({ mode: 'serial' });
 
 const PLAYERS = 4;
+
+/**
+ * Ohne GPU rendert Chromium per SwiftShader. Wird ein Frame dann länger als PIXIs
+ * `maxElapsedMS`, klemmt der Ticker den Zeitschritt ab — die Show läuft in Zeitlupe
+ * weiter, statt zu springen. Das ist auf einem echten Gerät genau richtig, macht aber
+ * jede Wanduhr-Messung wertlos. Solche Tests sagen es dann lieber, statt falsch rot zu
+ * werden; die exakten Dauern prüft ohnehin `choreographer.test.ts` am Skript.
+ */
+async function isSoftwareRenderer(page: Page): Promise<boolean> {
+  const renderer = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    return info && gl ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+  });
+  return /swiftshader|llvmpipe|software/i.test(renderer);
+}
 
 async function tapPass(page: Page): Promise<void> {
   const pass = page.locator('.screen--pass');
@@ -48,20 +65,20 @@ async function enterArena(page: Page, query = '', players = PLAYERS): Promise<vo
 }
 
 test('die Show läuft durch und endet im Result', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await enterArena(page);
 
   // LOCK-Schriftzug erscheint in der Lock-Phase.
-  await expect(page.locator('.arena__lock')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.arena__lock')).toBeVisible({ timeout: 40_000 });
   // Nach dem Schuss darf übersprungen werden (GDD §6.4).
-  await expect(page.locator('.arena__skip')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.arena__skip')).toBeVisible({ timeout: 40_000 });
 
-  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.result__headline')).toContainText('trinkt');
 });
 
 test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
 
   const measure = async (option: RegExp): Promise<number> => {
     await page.addInitScript(() => {
@@ -82,23 +99,32 @@ test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => 
       await tapPass(page);
       await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
     }
-    await page.locator('.screen--arena').waitFor({ timeout: 20_000 });
+    await page.locator('.screen--arena').waitFor({ timeout: 30_000 });
     const started = Date.now();
-    await page.locator('.screen--result').waitFor({ timeout: 60_000 });
+    await page.locator('.screen--result').waitFor({ timeout: 90_000 });
     return Date.now() - started;
   };
 
   const short = await measure(/Kurz/);
+  const software = await isSoftwareRenderer(page);
   const long = await measure(/Lang/);
 
-  console.log(`Kurz ${short} ms · Lang ${long} ms`);
-  // 10 s gegen 22 s Skript; die Todesanimation kommt bei beiden gleich obendrauf.
+  console.log(`Kurz ${short} ms · Lang ${long} ms${software ? ' (Software-Renderer)' : ''}`);
+
+  // Grundaussage gilt überall: „Lang" dauert spürbar länger als „Kurz".
+  expect(long).toBeGreaterThan(short + 5_000);
+
+  // Die exakte Spanne nur dort, wo die Wanduhr überhaupt etwas misst.
+  test.skip(
+    software,
+    'Software-Renderer: PIXI klemmt lange Frames ab, die Show läuft dann gedehnt.'
+  );
   expect(long - short).toBeGreaterThan(8_000);
   expect(long - short).toBeLessThan(16_000);
 });
 
 test('Filter sind ausserhalb von Lock und Schuss abgeschaltet (Audit A3)', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await enterArena(page, '?dev=1&hold=1');
 
   // Frühe Phase: Scan und Panik laufen ohne Filter.
@@ -110,7 +136,7 @@ test('Filter sind ausserhalb von Lock und Schuss abgeschaltet (Audit A3)', async
 });
 
 test('Tab-Wechsel pausiert die Show', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await enterArena(page, '?dev=1');
 
   await page.evaluate(() => {
@@ -127,11 +153,11 @@ test('Tab-Wechsel pausiert die Show', async ({ page }) => {
     Object.defineProperty(document, 'hidden', { value: false, configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
 });
 
 test('stumm komplett spielbar (Audit A3)', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -159,7 +185,7 @@ test('stumm komplett spielbar (Audit A3)', async ({ page }) => {
     await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
   }
 
-  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.result__headline')).toContainText('trinkt');
   expect(errors).toEqual([]);
 });

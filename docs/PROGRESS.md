@@ -244,7 +244,7 @@ Dazu ein Handwerksfehler: Die Hüte schwebten über dem Kopf, weil ihre SVGs unt
 | `npm run typecheck` | ✅ | 0 Fehler |
 | `npm run lint` | ✅ | 0 Fehler, 0 Warnings |
 | `npm run test:unit` | ✅ | **228 passed**, 5 todo (M4) |
-| `npm run test:e2e` | ✅ | 34 grün (24 Flow + 10 Show) auf iPhone 12 (WebKit) und Pixel 5 |
+| `npm run test:e2e` | ✅ | 34 grün (24 Flow + 10 Show) auf iPhone 12 (WebKit) und Pixel 5. Läuft bewusst seriell — Tests, die eine 15-Sekunden-Show in Echtzeit abwarten, nehmen sich parallel gegenseitig die CPU weg. |
 | `npm run test:perf` | ✅ | 4 grün |
 | Kein hardcodierter UI-Text | ✅ | Grep 0 Treffer |
 | Bundle | ✅ | 234 KB JS gzip über alle Chunks (Budget 450 KB). Die Filter liegen in eigenen Chunks und werden erst beim Schuss geladen. |
@@ -268,6 +268,8 @@ Dazu ein Handwerksfehler: Die Hüte schwebten über dem Kopf, weil ihre SVGs unt
 4. **Die Ziel-Reparatur reparierte sich im Kreis.** Der erste Ansatz schob Fake-Locks nachträglich in eine fertige Reihenfolge und behob dabei eine Wiederholung, während er die nächste erzeugte. Ersetzt durch eine Slot-Folge, die in einem Durchgang gefüllt wird.
 5. **Das Opfer hing systematisch *kürzer* im Fadenkreuz.** Ein Fehler, den der Audit gar nicht prüft — er misst nur die Obergrenze. Weil Fake-Locks nie auf dem Opfer landeten und lange halten, bekam es 10.6 % statt 12.5 % der Aufmerksamkeit. Auch das ist ein Muster. Behoben über frühe Fakes auf dem Opfer (ADR-19) und einen Ausgleich über die Haltezeiten (ADR-22): Abweichung bei zwei Spielern von 18.3 % auf **1.7 %**.
 6. **Die Perf-Messung maß den Testrechner.** Headless-Chromium rendert ohne GPU in Software; die Arena lief dort mit 30 statt 60 fps. Mit GPU-Flags sind es 16.7 ms p50. Der Test erkennt den Software-Fall jetzt und sagt es, statt falsch grün oder falsch rot zu sein (ADR-23).
+
+Dazu ein Nachtrag aus der CI: Der erste Lauf war rot. Auf einem Runner ohne GPU klemmt PIXI zu lange Frames ab (`maxElapsedMS`), wodurch die Show gedehnt statt springend weiterläuft — richtig auf einem echten Gerät, aber jede Wanduhr-Messung wird dadurch wertlos. Die betroffene Prüfung sagt das jetzt, statt zu scheitern. Ausserdem laufen die E2E-Tests seit diesem Meilenstein **seriell**: Wer eine 15-Sekunden-Show in Echtzeit abwartet, darf nicht neben einer zweiten Show laufen.
 
 **Offene SOLL-Follow-ups:**
 - Low-Effects-Auslösung bei CPU-Drossel 6× erneut prüfen (Übertrag aus A2; die Szene ist inzwischen teurer, könnte jetzt greifen).

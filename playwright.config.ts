@@ -6,10 +6,16 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
+  /*
+   * Bewusst **nicht** parallel: Ein grosser Teil der Tests spielt eine 10–22 s lange Show
+   * in Echtzeit ab und misst dabei Wartezeiten. Laufen zwei davon gleichzeitig, nehmen
+   * sie sich die CPU weg — die leichten Tests werden dadurch flaky und die Zeitmessungen
+   * falsch. Ein Testlauf dauert so ein paar Minuten länger und ist dafür verlässlich.
+   */
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  ...(process.env.CI ? { workers: 1 } : {}),
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: 'http://localhost:4173/Drinkshot/',

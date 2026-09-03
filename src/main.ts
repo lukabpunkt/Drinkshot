@@ -15,7 +15,7 @@ import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
 import { createFsm, type GameState, type Transition } from '@/core/fsm';
 import { createSessionStore, resolveRound } from '@/core/session';
-import { preloadArenaAssets } from '@/game/ArenaApp';
+import { arenaUpdateTimes, preloadArenaAssets } from '@/game/ArenaApp';
 import { confirmSheet } from '@/ui/components/sheet';
 import { showToast } from '@/ui/components/toast';
 import { setHapticsEnabled } from '@/ui/haptics';
@@ -224,5 +224,13 @@ void router.go(SCREEN_FOR_STATE[fsm.state]);
 void registerServiceWorker();
 
 if (dev) {
-  Object.assign(globalThis, { drinkshot: { fsm, session, router } });
+  Object.assign(globalThis, {
+    drinkshot: {
+      fsm,
+      session,
+      router,
+      /** Von `perf.spec.ts` gelesen: reine JS-Zeit pro Frame (Architektur §7.10). */
+      arenaUpdateTimes: () => arenaUpdateTimes(),
+    },
+  });
 }

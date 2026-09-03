@@ -60,3 +60,21 @@ Kontext: Weiche Steering-Kräfte heben sich im Knäuel gegenseitig auf — acht 
 
 ## ADR-17 · 2026-09-03 · Atlas meldet seine Auflösung selbst
 Kontext: `free-tex-packer-core` schreibt immer `meta.scale: 1`. Auf Retina-Geräten lädt die App den @2x-Atlas — PIXI rechnete dessen Texturpixel dadurch 1:1 in Welteinheiten um und zeichnete **alles doppelt so groß**, lautlos und nur auf echten Geräten. Entscheidung: `build-atlas.mjs` schreibt `meta.scale` passend zum Faktor in die JSON. Konsequenz: @1x und @2x liefern identische Weltgrößen; der Fehler kann nicht zurückkommen, weil die Metadaten aus derselben Variable stammen wie das Rendering.
+
+## ADR-18 · 2026-09-03 · Scan-Verweildauer weicht bei vielen Spielern nach unten ab
+Kontext: GDD §3.5 nennt 0.6–1.2 s Verweildauer pro Spieler im Scan; acht Spieler in 4.5 s Scan-Budget ergeben rechnerisch 562 ms. Entscheidung: Passt das Budget nicht, bekommen **alle** gleich viel statt einzelne die volle Zeit. Konsequenz: Bei acht Spielern ist der Scan hektischer als geplant — dafür hängt niemand auffällig länger im Fadenkreuz, und genau das ist die wichtigere Regel.
+
+## ADR-19 · 2026-09-03 · Frühe Fake-Locks dürfen das Opfer treffen
+Kontext: Architektur §5.4 verlangt für **alle** Fakes ein Nicht-Opfer, GDD §3.5 nur für den letzten. Mit der strengen Lesart hing das Opfer messbar **kürzer** im Fadenkreuz als alle anderen (10.6 % statt 12.5 % bei acht Spielern) — auch das ist ein Muster. Entscheidung: Nur der letzte Fake schliesst das Opfer aus (maximale Fallhöhe); frühere dürfen es treffen. Konsequenz: Die Verweilzeiten gleichen sich an, und ein Fake auf dem Opfer, das dann wegspringt und später doch stirbt, ist die bessere Irreführung. Architektur §5.4 wird entsprechend nachgezogen.
+
+## ADR-20 · 2026-09-03 · Platzhalter-Sounds werden zur Laufzeit synthetisiert
+Kontext: GDD §7 sieht ein howler-Audio-Sprite vor; die Toolchain hat keinen OGG/MP3-Encoder, und die Roadmap erlaubt ausdrücklich generierte Platzhalter. Entscheidung: `AudioManager` erzeugt die Cues per Web Audio (Oszillator + Rauschen + Hüllkurve) hinter genau der API, die ein Sprite später ebenfalls bedient. Konsequenz: null Bytes Bundle, offline ab dem ersten Start, Cues liegen exakt auf der Audio-Uhr (A3 verlangt ± 50 ms). In M6 wird der Klangerzeuger hinter der Fassade getauscht, ohne einen Aufrufer anzufassen.
+
+## ADR-21 · 2026-09-03 · Slow-Mo bremst die Welt, nicht das Drehbuch
+Kontext: Die naheliegende Umsetzung über `gsap.globalTimeline.timeScale` verlangsamte auch die Show-Timeline — die Lock-Phase dehnte sich um den Faktor 2.5 und die Dauer-Presets (10/15/22 s) waren hinfällig. Entscheidung: Slow-Mo lebt in `Camera.timeScale` und skaliert den Zeitschritt von Männchen und Partikeln; die Show-Uhr läuft in Echtzeit weiter. Konsequenz: Die Presets halten auf ± 1 s, und die Zeitlupe fühlt sich trotzdem an — weil sich genau das bewegt, was man beobachtet.
+
+## ADR-22 · 2026-09-03 · Verweilzeiten werden über die Haltezeiten ausgeglichen
+Kontext: Die Ziele der Panik-Beats liegen weitgehend fest (kein Ziel zweimal hintereinander, bei zwei Spielern also strikte Abwechslung; der letzte Fake gehört dem Nicht-Opfer und hält doppelt so lange wie ein Panik-Beat). Über die Ziel-Auswahl allein blieb bei zwei Spielern eine Abweichung von 18 % stehen. Entscheidung: `balanceHolds()` streckt und staucht die Aim-Beats jedes Spielers innerhalb von [300, 700] ms, bis alle gleich lange im Fadenkreuz hingen; das Phasen-Budget bleibt unverändert. Konsequenz: Abweichung bei zwei Spielern von 18.3 % auf 1.7 %, bei acht auf 11 % — jeweils deutlich unter der Audit-Grenze.
+
+## ADR-23 · 2026-09-03 · Perf-Tests brauchen eine GPU und sagen es sonst
+Kontext: Headless-Chromium rendert ohne GPU per SwiftShader in Software; die Arena lief dort mit 30 statt 60 fps. Das misst den Testrechner, nicht das Spiel. Entscheidung: Playwright startet Chromium mit GPU-Flags; `perf.spec.ts` liest den Renderer aus und überspringt die Frame-Zeit-Messung auf Software-Renderern mit klarer Begründung. Zusätzlich misst ein eigener Test die **reine JS-Zeit pro Frame** (Architektur §7.10) — die hängt nicht am Renderer und läuft überall. Konsequenz: Kein grüner Test, der nichts aussagt, und kein roter, der nur die Testmaschine anzeigt.

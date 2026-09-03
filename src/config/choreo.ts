@@ -99,8 +99,14 @@ export const CHOREO_FAIRNESS = {
   victimShareTolerance: 0.05,
   /** Nie zweimal hintereinander dasselbe Ziel. */
   forbidImmediateRepeat: true,
-  /** Der letzte Fake-Lock vor dem echten Lock ist nie das Opfer. */
+  /**
+   * Der **letzte** Fake-Lock vor dem echten Lock ist nie das Opfer (GDD §3.5, maximale
+   * Fallhöhe). Frühere Fakes dürfen das Opfer treffen — sie müssen es sogar, sonst
+   * hängt das Opfer messbar kürzer im Fadenkreuz als alle anderen (ADR-19).
+   */
   lastFakeMustNotBeVictim: true,
+  /** Frühere Fake-Locks dürfen auf dem Opfer landen. */
+  earlyFakesMayTargetVictim: true,
   /** Bei 2 Spielern mindestens so viele Aim-Beats in der Panik-Phase. */
   minPanicBeatsTwoPlayers: 4,
 } as const;
@@ -109,12 +115,17 @@ export const CHOREO_FAIRNESS = {
 /* Herzschlag & Audio-Kurve                                            */
 /* ------------------------------------------------------------------ */
 
-export const HEARTBEAT = {
+export const HEARTBEAT: {
+  startPhase: PhaseId;
+  bpm: readonly [number, number];
+  duckTo: number;
+  duckMs: number;
+} = {
   /** Setzt in der Panik-Phase ein. */
-  startPhase: 'panic' as PhaseId,
+  startPhase: 'panic',
   /** Tempo in BPM von Panik-Beginn bis Shot. */
-  bpm: [70, 140] as const,
+  bpm: [70, 140],
   /** Musik wird beim Lock geduckt. */
   duckTo: 0.25,
   duckMs: 300,
-} as const;
+};

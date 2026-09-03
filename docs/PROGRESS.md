@@ -5,7 +5,7 @@
 | M0 Setup & Skelett | ✅ fertig (⏳ 4 manuelle Checks offen) | `v0.0.1` | A0 bestanden |
 | M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
 | M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
-| M3 Scope, Choreo, Schuss | ⬜ offen | – | – |
+| M3 Scope, Choreo, Schuss | ✅ fertig (⏳ 3 manuelle Checks offen) | `v0.3.0` | A3 bestanden |
 | M4 Todesanimationen | ⬜ offen | – | – |
 | M5 Polish, Modi, A11y | ⬜ offen | – | – |
 | M6 Playtest & Release | ⬜ offen | – | – |
@@ -205,3 +205,77 @@ Dazu ein Handwerksfehler: Die Hüte schwebten über dem Kopf, weil ihre SVGs unt
 - [ ] **Wirken die Männchen lebendig?** Arena auf dem Handy ansehen (<https://lukabpunkt.github.io/Drinkshot/>, 4 und 8 Spieler). Laufen sie glaubwürdig? Ist das Blinzeln zu hektisch oder zu selten? Ist die Grundgeschwindigkeit richtig?
 - [ ] **Look-Check gegen die Art Direction:** Sind die Outlines dick genug, die Köpfe groß genug, die Farben satt genug? `docs/screens/m2-rig.png` neben `docs/02-ART-DIRECTION.md §5` legen.
 - [ ] Optional, aber hilfreich für M3: Fällt dir eine Farbe schwerer als die anderen, sobald das Scope-Dunkel kommt?
+
+## Audit A3 — 2026-09-03
+
+**Ergebnis:** BESTANDEN (alle automatisierbaren MUSS-Checks grün; 3 Checks brauchen echte Menschen)
+
+| Check | Status | Notiz |
+|---|---|---|
+| Choreographer: Fairness (Opfer-Verweilzeit ≤ 1/n + 5 % über 10 000 Seeds) | ✅ | Für 2 bis 8 Spieler, je 10 000 Seeds. Schlimmster gemessener Wert je Spielerzahl: 49.8 % (n=2, Grenze 55.0) · 33.3 % (n=3, Grenze 38.3) · 25.7 % (n=4, Grenze 30.0) · 21.5 % (n=5) · 19.2 % (n=6) · 17.3 % (n=7) · 16.0 % (n=8, Grenze 17.5). |
+| Choreographer: letzter Fake ≠ Opfer | ✅ | 10 000 Seeds × 7 Spielerzahlen. Frühere Fakes dürfen das Opfer treffen (ADR-19) — das ist eine bewusste Präzisierung, kein Schlupfloch. |
+| Choreographer: 2-Spieler-Minimum | ✅ | Mindestens 4 Panik-Beats, für alle drei Dauer-Presets geprüft. |
+| Choreographer: Determinismus | ✅ | Gleicher Seed ⇒ identisches Skript (200 Seeds, tiefer Vergleich); anderer Seed ⇒ in 190+ von 200 Fällen anderes Skript. |
+| 1 000 simulierte Runden: `victimId` == angezeigtes Opfer in 100 % | ✅ | `showPipeline.test.ts` fährt die **ganze Kette**: Einsätze → `pickVictim` (sicherer Zufall) → `RoundSetup` → `ShowScript` → Lock-Ziel → `resolveRound`. 1 000 Runden mit wechselnder Spielerzahl, Modus und Dauer: das Lock-Ziel war immer das gezogene Opfer, und wer trinkt, passt zum Modus. |
+| Perf-Test grün (p50 ≤ 20 ms, p95 ≤ 40 ms, CPU 4×) | ✅ | 8 Shotlings mit voller Show: **p50 16.7 ms · p95 18.5 ms · 2 Long-Tasks**. Zusätzlich neu: **JS-Zeit pro Frame p95 = 0.60 ms** bei 4-facher Drosselung (Budget 4 ms, Architektur §7.10) — dieser Wert hängt nicht am Renderer und misst überall dasselbe. |
+| Filter nur während Shot/Lock aktiv | ✅ | `Scope.clearFilters()` setzt `view.filters = []`; Shockwave und RGB-Split werden **lazy** importiert (eigener Chunk) und nach dem Effekt zerstört. E2E prüft über die Scan- und Panik-Phase hinweg, dass das Dev-Panel `fltr aus` meldet. |
+| Dauer-Presets 10/15/22 s ± 1 s | ✅ | Unit: 1 000 Runden × 3 Presets, Abweichung ≤ 1 s. E2E misst die echte Wanduhr: Kurz 11.9 s, Lang 23.0 s (jeweils inklusive derselben Todesanimation). |
+| Stumm komplett spielbar | ✅ | E2E entfernt `AudioContext` **und** `webkitAudioContext` komplett und schaltet den Ton ab — die Runde läuft ohne einen einzigen Fehler bis zum Result durch. |
+| Lock-Ticks synchron zur Reticle-Bewegung (± 50 ms) | ✅ konstruktiv | Der Tick wird nicht im Frame-Loop ausgelöst, sondern auf der **AudioContext-Uhr vorgeplant**: `play('lock_tick', hopMs/1000)` legt ihn exakt auf das Ende der Reticle-Fahrt. Damit ist der Versatz nicht „klein", sondern vom Scheduler garantiert. Der Höreindruck bleibt Lukas Urteil. |
+| Tab-Wechsel → Pause, Rückkehr → Fortsetzung | ✅ | E2E: `visibilitychange` auf hidden — die Show bleibt drei Sekunden stehen und läuft nach dem Zurückschalten sauber weiter. Der PIXI-Ticker und GSAP stoppen zusätzlich in `ArenaApp`. |
+| Wake-Lock aktiv | ✅ umgesetzt, ⏳ Gerät | `navigator.wakeLock.request('screen')` beim Betreten der Arena, mit erneutem Anfordern nach einem Tab-Wechsel (das Betriebssystem gibt den Lock dabei frei). Schlägt still fehl, wo es die API nicht gibt. Ob das Display 30 s durchhält, zeigt nur ein echtes Gerät. |
+| Slow-Mo, Zoom, Herzschlag, Vignette-Puls im Lock spürbar | ⏳ manuell | Alles umgesetzt und in `docs/screens/m3-lock.png` sichtbar (rotes Reticle, zugeschnappte Eckklammern, chromatischer Rand, LOCK-Schriftzug). Ob es sich *spürbar* anfühlt, entscheidet der Ton und das Handy. |
+| Spannungs-Test: 3 Personen sehen 5 Shows | ⏳ manuell | Das ist der eigentliche Test dieses Meilensteins und lässt sich nicht automatisieren. Protokoll unten. |
+
+### Definition of Done (Roadmap M3)
+
+| Kriterium | Status | Messwert |
+|---|---|---|
+| Die Show erzeugt nachweislich Spannung | ⏳ manuell | Fake-Locks, Slow-Mo, Herzschlag und Zoom sind da — die Wirkung misst nur ein Mensch |
+| Timing-Presets funktionieren | ✅ | 10/15/22 s ± 1 s, unit- und E2E-geprüft |
+| Perf-Test grün | ✅ | p50 16.7 ms · p95 18.5 ms · JS 0.60 ms |
+| Ergebnis stimmt zu 100 % mit `victimId` überein | ✅ | 1 000 Runden über die ganze Kette |
+| Sound optional (stumm voll spielbar) | ✅ | E2E ohne AudioContext |
+
+### Standing Audit
+
+| Check | Status | Notiz |
+|---|---|---|
+| `npm run typecheck` | ✅ | 0 Fehler |
+| `npm run lint` | ✅ | 0 Fehler, 0 Warnings |
+| `npm run test:unit` | ✅ | **228 passed**, 5 todo (M4) |
+| `npm run test:e2e` | ✅ | 34 grün (24 Flow + 10 Show) auf iPhone 12 (WebKit) und Pixel 5 |
+| `npm run test:perf` | ✅ | 4 grün |
+| Kein hardcodierter UI-Text | ✅ | Grep 0 Treffer |
+| Bundle | ✅ | 234 KB JS gzip über alle Chunks (Budget 450 KB). Die Filter liegen in eigenen Chunks und werden erst beim Schuss geladen. |
+
+### Was M3 geliefert hat
+
+- **`core/choreographer.ts`** — erzeugt das `ShowScript` deterministisch aus dem Seed: Intro, Scan (jeder genau einmal), Panik mit eingebauten Fake-Locks, Lock, Schuss, Tod, Outro. Die Anti-Vorhersagbarkeits-Regeln sind Teil der Konstruktion, nicht nachträglich geprüft.
+- **`game/Scope.ts`** — Vignette mit weichem 24-px-Rand (als Radial-Textur, nicht als harte Kante), Fadenkreuz mit Mil-Dots und freiem Zentrum, vier Eckklammern, Atem-Wobble über Simplex-Noise, Lock/Fake-Lock/Flash, Glas-Effekte über lazy geladene Filter. Das Fadenkreuz ist auf das Sichtfenster maskiert.
+- **`game/Camera.ts`** — Zoom, Parallax gegen die Sprungrichtung, Screen-Shake mit exponentiellem Abklingen, Slow-Mo, Nachbeben.
+- **`game/ShowDirector.ts`** — eine GSAP-Timeline für die ganze Show; Beats steuern Scope, Kamera, Männchen und Ton. Das anvisierte Männchen bekommt Angst-Gesicht und Blick zur Kamera, das vorherige sprintet weg.
+- **`game/deaths/`** — `DeathSequence`-Interface, Registry mit gewichteter Auswahl und No-Repeat-Fenster, `basic_fall` als erster vollständiger Eintrag nach allen sieben Animationsprinzipien.
+- **`game/fx/`** — Partikel-Pool mit Kategorie-Budgets, Einschlag- und Erdfontänen-Effekte, Grabstein-Pop, Sprechblasen.
+- **`audio/AudioManager.ts`** — 18 Cues, prozedural erzeugt (ADR-20), Herzschlag mit steigendem Tempo, Musik-Ducking, iOS-Unlock.
+- **Wake-Lock** in der Arena, „Tippen zum Überspringen" nach dem Schuss, Dev-Panel mit Seed-Anzeige, Filter-Status, JS-Zeit und Wiederholen-Knopf.
+
+### Sechs gefundene Fehler
+
+1. **PIXI startete nicht.** Es baut Shader-Code per `new Function`, unsere CSP verbietet `unsafe-eval`. Statt die CSP aufzuweichen läuft jetzt der eval-freie PIXI-Pfad (ADR-15). Ein zweiter Verstoß fiel nur unter WebKit auf: PIXI lädt seine Default-Textur als `data:`-URL.
+2. **Slow-Mo bremste die Show selbst aus.** `gsap.globalTimeline.timeScale(0.4)` verlangsamte auch die Show-Timeline — die Runde dauerte plötzlich 25 statt 15 Sekunden und erreichte den Result-Screen gar nicht mehr. Slow-Mo gehört in die Welt, nicht ins Drehbuch (ADR-21).
+3. **Das Fadenkreuz zielte auf den Rasen.** `brain.y` ist der Bodenpunkt des Männchens; das Reticle landete konsequent unter den Füssen statt auf dem Körper. Aufgefallen erst beim Betrachten eines Screenshots — kein Test hätte das gemerkt.
+4. **Die Ziel-Reparatur reparierte sich im Kreis.** Der erste Ansatz schob Fake-Locks nachträglich in eine fertige Reihenfolge und behob dabei eine Wiederholung, während er die nächste erzeugte. Ersetzt durch eine Slot-Folge, die in einem Durchgang gefüllt wird.
+5. **Das Opfer hing systematisch *kürzer* im Fadenkreuz.** Ein Fehler, den der Audit gar nicht prüft — er misst nur die Obergrenze. Weil Fake-Locks nie auf dem Opfer landeten und lange halten, bekam es 10.6 % statt 12.5 % der Aufmerksamkeit. Auch das ist ein Muster. Behoben über frühe Fakes auf dem Opfer (ADR-19) und einen Ausgleich über die Haltezeiten (ADR-22): Abweichung bei zwei Spielern von 18.3 % auf **1.7 %**.
+6. **Die Perf-Messung maß den Testrechner.** Headless-Chromium rendert ohne GPU in Software; die Arena lief dort mit 30 statt 60 fps. Mit GPU-Flags sind es 16.7 ms p50. Der Test erkennt den Software-Fall jetzt und sagt es, statt falsch grün oder falsch rot zu sein (ADR-23).
+
+**Offene SOLL-Follow-ups:**
+- Low-Effects-Auslösung bei CPU-Drossel 6× erneut prüfen (Übertrag aus A2; die Szene ist inzwischen teurer, könnte jetzt greifen).
+- Wipe-Performance im DevTools-Panel gegenmessen (Übertrag aus A1).
+
+**Manuelle Checks, die Luka bestätigen muss, bevor M4 startet:**
+- [ ] **Der Spannungs-Test — der eigentliche Test dieses Meilensteins.** Drei Personen je fünf Shows zeigen (<https://lukabpunkt.github.io/Drinkshot/>, mit Ton). Zwei Fragen: *Konntest du vorhersagen, wen es trifft?* (Ziel: mindestens 2 von 3 sagen nein) und *hat jemand beim Fake-Lock reagiert?* (Ziel: mindestens ein „Neeein"). Wenn niemand zuckt, ist die Dramaturgie das Problem, nicht der Code.
+- [ ] **Ton auf dem Handy:** Sitzen die Lock-Ticks auf der Reticle-Bewegung? Trägt der Herzschlag? Die Sounds sind synthetisiert (ADR-20) und bewusst schlicht — sag, was fehlt, dann kommen in M6 echte Samples an dieselbe Stelle.
+- [ ] **Wake-Lock:** Bleibt das Display während einer 22-Sekunden-Show (Preset „Lang") an?
+
+**Zum Anschauen:** `docs/screens/m3-intro.png`, `-scan`, `-panik`, `-lock`, `-shot`, `-tod` — die sechs Phasen der Show in der Reihenfolge, in der sie laufen.

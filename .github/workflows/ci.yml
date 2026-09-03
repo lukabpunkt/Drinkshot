@@ -73,8 +73,13 @@ jobs:
         # iPhone 12 laeuft in Playwright unter WebKit (Safari-Referenz), Pixel 5 unter Chromium.
         run: npx playwright install --with-deps chromium webkit
 
-      - name: E2E-Flow
+      - name: E2E-Flow und Show
         run: npm run test:e2e
+
+      - name: Performance
+        # Der Frame-Zeit-Test überspringt sich selbst, wenn der Runner ohne GPU per
+        # SwiftShader rendert; Draw-Calls, JS-Zeit und Heap werden trotzdem geprüft.
+        run: npm run test:perf -- --project="Pixel 5"
 
       - if: failure()
         uses: actions/upload-artifact@v4

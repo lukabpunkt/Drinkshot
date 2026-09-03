@@ -2,7 +2,7 @@
 
 Ein Mobile-First Pass-the-Phone-Trinkspiel für 2–8 Personen. Jeder setzt heimlich Schlücke, dann laufen kleine Cartoon-Männchen um ihr Leben, während ein Scharfschütze durchs Zielfernrohr zielt. Wer getroffen wird, trinkt — je mehr du setzt, desto wahrscheinlicher trifft es dich.
 
-**Status:** M2 (Shotlings & Arena) abgeschlossen → nächster Meilenstein ist M3 (Scope, Choreografie, Schuss). Live: <https://lukabpunkt.github.io/Drinkshot/>. Fortschritt in [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Status:** M3 (Scope, Choreografie, Schuss) abgeschlossen → nächster Meilenstein ist M4 (die zwölf Todesanimationen). Live: <https://lukabpunkt.github.io/Drinkshot/>. Fortschritt in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Loslegen
 

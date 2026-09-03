@@ -861,13 +861,35 @@
   opacity: 0;
 }
 
-.arena__overlay {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
+/* Der LOCK-Schriftzug liegt im DOM: i18n, Kontrast und Screenreader inklusive. */
+.arena__lock {
+  position: absolute;
+  top: calc(var(--space-7) + var(--safe-top));
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  letter-spacing: 0.22em;
+  color: var(--c-danger);
+  text-shadow: 0 0 18px rgb(255 45 85 / 55%);
+  animation: lock-blink 620ms steps(2, end) infinite;
   pointer-events: none;
+}
+
+@keyframes lock-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena__lock {
+    animation: none;
+  }
 }
 
 .arena__shot {
@@ -1371,4 +1393,15 @@
 .dev__row input[type='range'] {
   width: 96px;
   accent-color: var(--c-accent);
+}
+
+.dev__button {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 1px solid rgb(255 248 231 / 25%);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-paper);
+  font-size: 11px;
+  cursor: pointer;
 }

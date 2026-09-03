@@ -68,6 +68,14 @@ export interface ArenaAppHandle {
   readonly app: Application;
   /** Alles Spielbare hängt hier drin; wird in Weltkoordinaten (1000×1000) gerechnet. */
   readonly world: Container;
+  /** Bildschirmraum über der Welt — hier lebt das Scope (unskaliert, in CSS-Pixeln). */
+  readonly overlay: Container;
+  /** Aktuelle Welt-Skalierung und -Position, damit Kamera und Scope umrechnen können. */
+  readonly layout: { scale: number; x: number; y: number; width: number; height: number };
+  /** Wird nach jedem Resize gerufen — Scope und Kamera hängen sich hier ein. */
+  onLayout(listener: (layout: ArenaAppHandle['layout']) => void): () => void;
+  /** Welt- → Bildschirmkoordinaten, allokationsfrei. */
+  worldToScreen(x: number, y: number, out: { x: number; y: number }): void;
   /** Hängt das Canvas in ein Host-Element und startet den Ticker. */
   attach(host: HTMLElement): void;
   /** Nimmt das Canvas aus dem DOM und pausiert — die App bleibt am Leben. */
@@ -78,6 +86,14 @@ export interface ArenaAppHandle {
   frameTimes(): readonly number[];
   /** Echte WebGL-Draw-Calls des letzten Frames (Audit A2: ≤ 3 in der Arena-Szene). */
   drawCalls(): number;
+  /**
+   * Reine JS-Zeit pro Frame (Simulation, ohne Rendern). Architektur §7.10 gibt dafür
+   * ≤ 4 ms vor — und anders als die Frame-Zeit ist dieser Wert unabhängig davon, ob der
+   * Testrechner eine GPU hat.
+   */
+  updateTimes(): readonly number[];
+  /** Wird vom Arena-Screen mit der gemessenen Update-Dauer gefüttert. */
+  recordUpdate(durationMs: number): void;
   destroy(): void;
 }
 
@@ -100,7 +116,11 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
   });
 
   const world = new Container();
-  app.stage.addChild(world);
+  const overlay = new Container();
+  app.stage.addChild(world, overlay);
+
+  const layout = { scale: 1, x: 0, y: 0, width: 1, height: 1 };
+  const layoutListeners = new Set<(value: typeof layout) => void>();
 
   /* --- Eine Uhr: PIXI treibt GSAP (§7.7) --- */
   gsap.ticker.remove(gsap.updateRoot);
@@ -119,6 +139,10 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
    */
   let drawsThisFrame = 0;
   let drawsLastFrame = 0;
+
+  const updateSamples = new Float32Array(SAMPLES);
+  let updateIndex = 0;
+  let updateCount = 0;
   instrumentDrawCalls(app, () => {
     drawsThisFrame++;
   });
@@ -137,17 +161,26 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
   let observer: ResizeObserver | undefined;
 
   /** Skaliert die 1000×1000-Welt so, dass sie mittig in den Host passt. */
-  const layout = (): void => {
+  const relayout = (): void => {
     if (!host) return;
     const width = host.clientWidth || 1;
     const height = host.clientHeight || 1;
     app.renderer.resize(width, height);
+
     const scale = Math.min(width, height) / ARENA.worldSize;
+    const x = (width - ARENA.worldSize * scale) / 2;
+    const y = (height - ARENA.worldSize * scale) / 2;
+
     world.scale.set(scale);
-    world.position.set(
-      (width - ARENA.worldSize * scale) / 2,
-      (height - ARENA.worldSize * scale) / 2
-    );
+    world.position.set(x, y);
+
+    layout.scale = scale;
+    layout.x = x;
+    layout.y = y;
+    layout.width = width;
+    layout.height = height;
+
+    for (const listener of layoutListeners) listener(layout);
   };
 
   const onVisibility = (): void => {
@@ -165,14 +198,32 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
   handle = {
     app,
     world,
+    overlay,
+    layout,
+
+    onLayout(listener) {
+      layoutListeners.add(listener);
+      listener(layout);
+      return () => layoutListeners.delete(listener);
+    },
+
+    /*
+     * Die Kamera verschiebt und skaliert `world` zur Laufzeit (Zoom, Shake, Parallax).
+     * Deshalb wird hier die **tatsächliche** Transformation gelesen und nicht die
+     * Ruhelage — sonst würde das Reticle beim Zoom vom Ziel abrutschen.
+     */
+    worldToScreen(x, y, out) {
+      out.x = world.position.x + x * world.scale.x;
+      out.y = world.position.y + y * world.scale.y;
+    },
 
     attach(target) {
       host = target;
       target.append(app.canvas);
       observer?.disconnect();
-      observer = new ResizeObserver(layout);
+      observer = new ResizeObserver(relayout);
       observer.observe(target);
-      layout();
+      relayout();
       app.ticker.start();
     },
 
@@ -186,6 +237,7 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
 
     clearWorld() {
       world.removeChildren();
+      overlay.removeChildren();
     },
 
     frameTimes() {
@@ -194,6 +246,16 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
 
     drawCalls() {
       return drawsLastFrame;
+    },
+
+    updateTimes() {
+      return Array.from(updateSamples.slice(0, updateCount));
+    },
+
+    recordUpdate(durationMs) {
+      updateSamples[updateIndex] = durationMs;
+      updateIndex = (updateIndex + 1) % SAMPLES;
+      if (updateCount < SAMPLES) updateCount++;
     },
 
     destroy() {
@@ -205,6 +267,11 @@ export async function getArenaApp(): Promise<ArenaAppHandle> {
   };
 
   return handle;
+}
+
+/** JS-Zeit pro Frame der laufenden Arena — Testhilfe für `perf.spec.ts`. */
+export function arenaUpdateTimes(): readonly number[] {
+  return handle?.updateTimes() ?? [];
 }
 
 /** Nur für Tests: gibt den Singleton frei. */

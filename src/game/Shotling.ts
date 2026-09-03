@@ -90,6 +90,14 @@ export class Shotling {
   private readonly face: Sprite;
   private readonly hat: Sprite;
 
+  /**
+   * Punkt, auf den das Fadenkreuz zielt: die Körpermitte, nicht der Bodenpunkt.
+   * `brain.x/y` ist die Position der Füsse — würde das Reticle dorthin fahren, zielte es
+   * konsequent auf den Rasen unter dem Männchen.
+   */
+  readonly aimPoint: { readonly x: number; readonly y: number };
+  private readonly aimOffsetY: number;
+
   private faceId: FaceId = 'neutral';
   private hatId: HatId;
   private blinkIn: number;
@@ -156,6 +164,20 @@ export class Shotling {
 
     this.view.addChild(this.shadow, this.body);
     this.view.scale.set(rigScaleFor(options.height ?? shotlingHeightFor(8)));
+
+    const height = options.height ?? shotlingHeightFor(8);
+    this.aimOffsetY = height * 0.58;
+    // Live-Getter statt Momentaufnahme: das Ziel läuft weiter, während das Reticle fährt.
+    const brain = this.brain;
+    const offsetY = this.aimOffsetY;
+    this.aimPoint = {
+      get x(): number {
+        return brain.x;
+      },
+      get y(): number {
+        return brain.y - offsetY;
+      },
+    };
 
     this.blinkIn = this.rng.intBetween(ARENA.blinkIntervalMs[0], ARENA.blinkIntervalMs[1]);
     this.syncPosition();

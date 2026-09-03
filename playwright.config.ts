@@ -17,7 +17,20 @@ export default defineConfig({
   },
   projects: [
     { name: 'iPhone 12', use: { ...devices['iPhone 12'] } },
-    { name: 'Pixel 5', use: { ...devices['Pixel 5'] } },
+    {
+      name: 'Pixel 5',
+      use: {
+        ...devices['Pixel 5'],
+        launchOptions: {
+          /*
+           * Ohne diese Flags rendert Headless-Chromium per SwiftShader in Software.
+           * Die Arena läuft dann mit 30 statt 60 fps — eine Eigenschaft des Testrechners,
+           * nicht des Spiels. `perf.spec.ts` erkennt den Software-Fall und sagt es.
+           */
+          args: ['--use-angle=default', '--enable-gpu', '--ignore-gpu-blocklist'],
+        },
+      },
+    },
   ],
   webServer: {
     command: 'npm run build && npm run preview',

@@ -239,11 +239,11 @@ type Beat =
 1. Phase-Budget aus Preset (`choreo.ts`): intro 10 %, scan 30 %, panic 33 %, lock 17 %, rest death.
 2. Scan: Permutation aller Spieler (Fisher-Yates, seeded), jeder 1× mit `holdMs ∈ [600,1200]`.
 3. Panic: `k` Beats mit `holdMs ∈ [300,700]`, Ziel zufällig, aber **nie zweimal hintereinander gleich** und **Opfer-Anteil ≤ 1/n + 5 %** (Fairness-Check im Unit-Test).
-4. Fake-Locks: 1 (short) / 2 (normal/long), Ziel ≠ Opfer, das letzte Fake ist der letzte Beat vor dem Lock.
+4. Fake-Locks: 1 (short) / 2 (normal/long). Das **letzte** Fake ist der letzte Beat vor dem Lock und nie das Opfer (maximale Fallhöhe). Frühere Fakes dürfen das Opfer treffen — sonst hängt es systematisch kürzer im Fadenkreuz als alle anderen (ADR-19).
 5. Lock auf Opfer, dann `shot`, dann `death` (bei Leg-/Miss-Deaths enthält die DeathSequence selbst den zweiten Schuss).
 6. Bei 2 Spielern: min. 4 Aim-Beats in Panic erzwingen.
 
-Der `ShowDirector` spielt das Skript mit einer **GSAP-Timeline** ab (ein Timeline-Objekt, `timeScale` für Slow-Mo, `pause/resume` bei Tab-Wechsel → `visibilitychange`).
+Der `ShowDirector` spielt das Skript mit einer **GSAP-Timeline** ab (ein Timeline-Objekt, `pause/resume` bei Tab-Wechsel → `visibilitychange`). Slow-Mo läuft **nicht** über die Show-Timeline, sondern über `Camera.timeScale`, das den Zeitschritt von Männchen und Partikeln skaliert — sonst dehnt sich die Lock-Phase und die Dauer-Presets stimmen nicht mehr (ADR-21).
 
 ---
 

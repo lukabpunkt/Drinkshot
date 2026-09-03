@@ -10,16 +10,20 @@
  */
 
 import { frameMedian, type ArenaAppHandle } from '@/game/ArenaApp';
-import { MAX_PLAYERS, MIN_PLAYERS } from '@/config/rules';
 
 export interface DevPanelOptions {
   host: HTMLElement;
   app: ArenaAppHandle;
   initialCount: number;
   lowEffects: boolean;
-  onCountChange: (count: number) => void;
+  /** Seed der laufenden Show — sichtbar, damit man einen Fall reproduzieren kann. */
+  seed?: number;
   onSpeedChange: (multiplier: number) => void;
   onLowEffectsChange: (value: boolean) => void;
+  /** Spielt die aktuelle Show noch einmal ab (M3). */
+  onReplay?: () => void;
+  /** Audit A3: Filter dürfen ausserhalb von Lock/Shot nicht aktiv sein. */
+  hasFilters?: () => boolean;
 }
 
 export interface DevPanel {
@@ -40,10 +44,6 @@ export function createDevPanel(options: DevPanelOptions): DevPanel {
   const controls = document.createElement('div');
   controls.className = 'dev__controls';
 
-  const count = createSlider('Shotlings', MIN_PLAYERS, MAX_PLAYERS, 1, options.initialCount, (value) => {
-    options.onCountChange(value);
-  });
-
   const speed = createSlider('Speed ×', 0, 20, 1, 10, (value) => {
     options.onSpeedChange(value / 10);
   });
@@ -58,7 +58,16 @@ export function createDevPanel(options: DevPanelOptions): DevPanel {
   lowText.textContent = 'Low-Effects';
   low.append(lowInput, lowText);
 
-  controls.append(count.el, speed.el, low);
+  controls.append(speed.el, low);
+
+  if (options.onReplay) {
+    const replay = document.createElement('button');
+    replay.type = 'button';
+    replay.className = 'dev__button';
+    replay.textContent = 'Show erneut abspielen';
+    replay.addEventListener('click', () => options.onReplay?.());
+    controls.append(replay);
+  }
   el.append(stats, controls);
   options.host.append(el);
 
@@ -69,12 +78,17 @@ export function createDevPanel(options: DevPanelOptions): DevPanel {
     const sorted = [...times].sort((a, b) => a - b);
     const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ?? 0;
     const draws = options.app.drawCalls();
+    const filters = options.hasFilters?.() ?? false;
+    const update = frameMedian(options.app.updateTimes());
     stats.textContent =
       `fps  ${(1000 / Math.max(median, 0.001)).toFixed(0).padStart(3)}\n` +
       `p50  ${median.toFixed(1).padStart(5)} ms\n` +
       `p95  ${p95.toFixed(1).padStart(5)} ms\n` +
+      `js   ${update.toFixed(2).padStart(5)} ms\n` +
       `draw ${String(draws).padStart(5)}\n` +
-      `mode ${lowInput.checked ? 'LOW' : 'FULL'}`;
+      `mode ${lowInput.checked ? 'LOW' : 'FULL'}\n` +
+      `fltr ${filters ? '  AN' : ' aus'}` +
+      (options.seed !== undefined ? `\nseed ${String(options.seed).slice(0, 10)}` : '');
   }, REFRESH_MS);
 
   return {

@@ -135,7 +135,17 @@ export const MOTION = {
 /* Animations-Konstanten fuer Tode (Art Direction §5.2)                */
 /* ------------------------------------------------------------------ */
 
-export const ANIM = {
+export const ANIM: {
+  hitStopMs: number;
+  squashScaleX: number;
+  squashScaleY: number;
+  squashMs: number;
+  followThroughMs: readonly [number, number];
+  shakeMs: number;
+  shakeAmplitudePx: number;
+  deathMinMs: number;
+  deathMaxMs: number;
+} = {
   /** Hit-Stop beim Treffer. */
   hitStopMs: 80,
   /** Squash & Stretch beim Aufprall. */

@@ -16,7 +16,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test tests/e2e/flow.spec.ts",
+    "test:e2e": "playwright test tests/e2e/flow.spec.ts tests/e2e/show.spec.ts",
     "test:perf": "playwright test tests/e2e/perf.spec.ts",
     "build:atlas": "node scripts/build-atlas.mjs",
     "build:audio": "node scripts/build-audio-sprite.mjs",
@@ -25,6 +25,7 @@
   "dependencies": {
     "gsap": "^3.13.0",
     "howler": "^2.2.4",
+    "pixi-filters": "^6.1.5",
     "pixi.js": "^8.6.0",
     "simplex-noise": "^4.0.3"
   },

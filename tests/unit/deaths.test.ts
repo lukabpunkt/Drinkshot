@@ -169,10 +169,21 @@ describe.each(REGISTERED.map((id) => [id] as const))('%s', (id) => {
     );
   });
 
-  it('lässt das Opfer am Ende als "dead" zurück', () => {
+  /*
+   * Architektur §6: „endet mit `victim.state === 'dead'` (ausser miracle)". Beim Wunder
+   * überlebt das Opfer — das ist der ganze Sinn der Sequenz, und der Result-Screen
+   * verlässt sich darauf.
+   */
+  it('lässt das Opfer im richtigen Zustand zurück', () => {
     const harness = makeHarness();
-    runToEnd(sequenceOf().build(harness.ctx));
-    expect(harness.ctx.victim.getState()).toBe('dead');
+    const sequence = sequenceOf();
+    runToEnd(sequence.build(harness.ctx));
+
+    if (sequence.zone === 'miracle') {
+      expect(harness.ctx.victim.getState(), 'beim Wunder überlebt das Opfer').not.toBe('dead');
+    } else {
+      expect(harness.ctx.victim.getState()).toBe('dead');
+    }
   });
 
   it('gibt das Rig nach reset() sauber zurück (Audit A4)', () => {
@@ -207,9 +218,10 @@ describe.each(REGISTERED.map((id) => [id] as const))('%s', (id) => {
     expect(harness.cues.length, `${id} spielt keinen Ton`).toBeGreaterThan(2);
   });
 
-  it('schliesst über finishDeath ab: Grabstein und Nachbeben', () => {
+  it('schliesst über finishDeath ab: Nachbeben, und Grabstein ausser beim Wunder', () => {
     const harness = makeHarness();
-    const timeline = sequenceOf().build(harness.ctx);
+    const sequence = sequenceOf();
+    const timeline = sequence.build(harness.ctx);
     runToEnd(timeline);
 
     expect(
@@ -217,10 +229,15 @@ describe.each(REGISTERED.map((id) => [id] as const))('%s', (id) => {
       `${id} benutzt finishDeath() nicht`
     ).toBe(true);
     expect(harness.afterShocks, `${id} hat kein Nachbeben`).toBeGreaterThan(0);
-    expect(harness.cues, `${id} setzt keinen Grabstein`).toContain('rip_pop');
+
+    if (sequence.zone === 'miracle') {
+      expect(harness.cues, 'beim Wunder gibt es kein Grab').not.toContain('rip_pop');
+    } else {
+      expect(harness.cues, `${id} setzt keinen Grabstein`).toContain('rip_pop');
+    }
   });
 
-  it('wackelt beim Treffer (Screen-Shake)', () => {
+  it('wackelt beim Schuss (Screen-Shake)', () => {
     const harness = makeHarness();
     runToEnd(sequenceOf().build(harness.ctx));
     expect(harness.shakes).toBeGreaterThan(0);
@@ -268,8 +285,13 @@ describe('Zweiter Schuss', () => {
 });
 
 describe('Hit-Stop', () => {
-  it('jede Sequenz hält beim Treffer 80 ms still (Art Direction §5.2)', () => {
+  /*
+   * Der Hit-Stop friert den Treffer-Frame ein. Beim Wunder gibt es keinen Treffer — die
+   * Kugel geht vorbei —, also auch nichts einzufrieren.
+   */
+  it('jede Sequenz mit Treffer hält 80 ms still (Art Direction §5.2)', () => {
     for (const sequence of allDeaths()) {
+      if (sequence.zone === 'miracle') continue;
       const harness = makeHarness();
       const timeline = sequence.build(harness.ctx);
       const holds = timeline
@@ -277,5 +299,30 @@ describe('Hit-Stop', () => {
         .filter((child) => Math.abs(child.duration() * 1000 - ANIM.hitStopMs) < 1);
       expect(holds.length, `${sequence.id} hat keinen Hit-Stop`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Miracle (GDD §4.1)', () => {
+  it('ist genau einmal registriert und braucht keinen zweiten Schuss', () => {
+    const miracles = allDeaths().filter((sequence) => sequence.zone === 'miracle');
+    expect(miracles.map((sequence) => sequence.id)).toEqual(['miracle_dodge']);
+    expect(miracles[0]!.needsSecondShot).toBe(false);
+  });
+
+  it('lässt auch die anderen am Leben', () => {
+    const harness = makeHarness();
+    const miracle = allDeaths().find((sequence) => sequence.zone === 'miracle')!;
+    runToEnd(miracle.build(harness.ctx));
+    for (const other of harness.ctx.others) {
+      expect(other.getState()).not.toBe('dead');
+    }
+  });
+
+  it('feiert statt zu trauern: Chor statt Grabstein', () => {
+    const harness = makeHarness();
+    const miracle = allDeaths().find((sequence) => sequence.zone === 'miracle')!;
+    runToEnd(miracle.build(harness.ctx));
+    expect(harness.cues).toContain('miracle_choir');
+    expect(harness.cues).not.toContain('rip_pop');
   });
 });

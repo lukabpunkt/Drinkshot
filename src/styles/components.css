@@ -986,6 +986,45 @@
   color: rgb(255 248 231 / 72%);
 }
 
+/* Wunder: der seltenste Ausgang bekommt sein eigenes Bild (GDD §4.1). */
+.result__legend {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  border: 3px solid var(--c-ink);
+  border-radius: 999px;
+  background: var(--c-accent);
+  color: var(--c-ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.1em;
+  box-shadow: 0 4px 0 var(--c-accent-shade);
+  animation: legend-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.screen--result-miracle .result__headline {
+  color: var(--c-accent);
+}
+
+@keyframes legend-pop {
+  0% {
+    transform: scale(0.4) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result__legend {
+    animation: none;
+  }
+}
+
 .result__note {
   margin: 0 0 var(--space-2);
   font-size: var(--fs-sm);

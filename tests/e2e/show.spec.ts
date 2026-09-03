@@ -209,3 +209,35 @@ test('stumm komplett spielbar (Audit A3)', async ({ page }) => {
   await expect(page.locator('.result__headline')).toContainText('trinkt');
   expect(errors).toEqual([]);
 });
+
+test('Wunder: niemand trinkt, und der Result-Screen feiert es (Audit A4)', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  /*
+   * `?death=miracle_dodge` erzwingt die Sequenz. Ohne das müsste der Test im Schnitt
+   * vierzig Runden spielen — die Rarität ist im GDD mit 1 zu 40 festgeschrieben.
+   */
+  await enterArena(page, '?dev=1&death=miracle_dodge', 3);
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
+
+  // Der seltenste Ausgang bekommt sein eigenes Bild.
+  await expect(page.locator('.result__legend')).toBeVisible();
+  await expect(page.locator('.result__headline')).toContainText('Niemand trinkt');
+  await expect(page.locator('.result__zone')).toContainText('Glück gehabt');
+
+  // Und die Regel greift: das Scoreboard bleibt bei null (GDD §4.1, Modus Klassik).
+  const totals = await page
+    .locator('.score__value')
+    .evaluateAll((nodes) => nodes.map((node) => Number(node.textContent)));
+  expect(totals.length).toBeGreaterThan(0);
+  expect(totals.every((value) => value === 0), `Scoreboard: ${totals.join(',')}`).toBe(true);
+});
+
+test('erzwungene Sequenz landet mit der richtigen Zone im Result', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  await enterArena(page, '?dev=1&death=leg_hop', 2);
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
+  // Zonen-Text aus der Registry, nicht aus einem Platzhalter.
+  await expect(page.locator('.result__zone')).toContainText('Ins Bein');
+});

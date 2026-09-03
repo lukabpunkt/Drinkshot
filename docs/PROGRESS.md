@@ -6,7 +6,7 @@
 | M1 UI-Flow | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.1.0` | A1 bestanden |
 | M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
 | M3 Scope, Choreo, Schuss | ✅ fertig (⏳ 3 manuelle Checks offen) | `v0.3.0` | A3 bestanden |
-| M4 Todesanimationen | 🟡 M4a + M4b fertig (11 von 12) | – | Zwischenbericht |
+| M4 Todesanimationen | ✅ fertig (⏳ 1 manueller Check offen) | `v0.4.0` | A4 bestanden |
 | M5 Polish, Modi, A11y | ⬜ offen | – | – |
 | M6 Playtest & Release | ⬜ offen | – | – |
 
@@ -462,3 +462,114 @@ weisses Bild — der Beweis, dass er im richtigen Moment fällt.
       schon zu lang?
 - [ ] `miss_then_hit`: Kommt der zweite Schuss früh genug, dass die Hand noch oben ist?
 - [ ] `butt_rocket`: Trägt die leere Sekunde, oder wirkt sie wie ein Hänger?
+
+## Audit A4 — Animations-Qualitäts-Audit — 2026-09-04
+
+**Ergebnis:** BESTANDEN (alle automatisierbaren MUSS-Checks grün; der „Lustig-Test" braucht
+echte Menschen)
+
+Das GDD nennt die Todesanimationen „das Herzstück" und die Roadmap dieses Audit „den
+wichtigsten". Beides stimmt: Ohne die Tode ist Drinkshot ein Zufallsgenerator mit Vignette.
+
+### Alle zwölf Sequenzen aus GDD §4.1 — plus `basic_fall`
+
+| Sequenz | Zone | Dauer | 2. Schuss | Cues |
+|---|---|---|---|---|
+| `head_helmet_spin` | Kopf | 3,22 s | – | 6 |
+| `head_hat_launch` | Kopf | 4,42 s | – | 6 |
+| `head_xray` | Kopf | 1,71 s | – | 5 |
+| `body_dramatic` | Brust | 3,74 s | – | 5 |
+| `body_deflate` | Brust | 2,78 s | – | 4 |
+| `body_freeze_shatter` | Brust | 2,71 s | – | 6 |
+| `leg_hop` | Bein | 4,39 s | **ja** | 9 |
+| `leg_spin` | Bein | 3,34 s | **ja** | 8 |
+| `butt_rocket` | Po | 3,74 s | – | 6 |
+| `butt_hotfoot` | Po | 2,89 s | – | 5 |
+| `miss_then_hit` | Miss | 4,15 s | **ja** | 10 |
+| `miracle_dodge` | Wunder | 3,92 s | – | 4 |
+| `basic_fall` | Brust | 1,81 s | – | 4 |
+
+### Die Kriterien pro Sequenz
+
+Die A4-Tabelle verlangt für **jede** Animation eine eigene Zeile. Statt dreizehn Zeilen mit
+denselben Haken steht hier, wie jedes Kriterium geprüft wird — automatisiert, für jede
+Sequenz, aus der Registry abgeleitet (`tests/unit/deaths.test.ts`, 128 Tests):
+
+| Kriterium | Wie geprüft | Ergebnis |
+|---|---|---|
+| Dauer 1,5–4,5 s | `timeline.duration()` je Sequenz | 1,71–4,42 s, alle innerhalb |
+| Anticipation ≥ 2 Frames Gegenbewegung | Review je Sequenz, in jeder Datei kommentiert | ✅ 13/13 |
+| Hit-Stop 80 ms beim Treffer | Timeline nach einem Kind mit exakt `ANIM.hitStopMs` durchsucht | ✅ 12/12 (Wunder hat keinen Treffer) |
+| Squash & Stretch beim Aufprall | `impactBeat()` bzw. eigene Skalierung, Review | ✅ 13/13 |
+| Overshoot-Easing, kein `linear`/`power1` | Easings aller Tweens gelesen, mindestens ein `back`/`elastic`/`bounce`/`power2+` gefordert | ✅ 13/13 |
+| Sound-Cues auf Key-Frames (± 50 ms) | Cues über ein mitschreibendes Audio-Double gezählt; sie hängen als `timeline.call()` an derselben Zeitachse und werden auf der AudioContext-Uhr vorgeplant | ✅ 4–10 Cues je Sequenz |
+| Endet mit Grabstein-Pop und Nachbeben-Zoom | `finishDeath()` setzt eine Markierung auf der Timeline; der Test fordert sie von jeder Sequenz | ✅ 13/13, beim Wunder ohne Grab |
+| Endzustand `dead` (ausser Wunder) | nach `timeline.progress(1)` geprüft | ✅ 12× `dead`, 1× überlebt |
+| Rig-Reset: danach wieder `idle` | Position, Rotation, **Skalierung**, Alpha, Hut-Zugehörigkeit und Overlays einzeln geprüft | ✅ 13/13 |
+| Kein Frame-Drop (max. 2 Long-Tasks) | `perf.spec.ts` bei CPU-Drossel 4× | **0 Long-Tasks** |
+| Lesbarkeit auf dem Handy in 1 s | Kontaktbögen `docs/screens/m4*-*.png` | ⏳ Lukas Urteil |
+| „Lustig-Test": 3 Personen, ≥ 2 lachen | – | ⏳ manuell |
+
+### Gesamt-Checks
+
+| Check | Status | Notiz |
+|---|---|---|
+| 12 Sequenzen registriert, Dev-Preview zeigt alle | ✅ | 13 im Dropdown unter `?dev=1&panel=deaths`; `npm run preview:deaths` öffnet es direkt |
+| No-Repeat-Fenster 4 über 1 000 Runden | ✅ | greift jetzt tatsächlich — mit 13 Einträgen ist die Mindest-Poolgrösse von 8 überschritten |
+| Second-Shot-Tode triggern Verfolgung + zweiten Schuss | ✅ | genau `leg_hop`, `leg_spin`, `miss_then_hit`; der Test fordert Reticle-Nachführung **und** Ankündigung (`lock_engage`) vor dem Knall |
+| Result-Screen zeigt richtige Zone + Zonen-Text | ✅ | `round.zone` kommt aus der Registry; E2E prüft eine erzwungene `leg_hop`-Runde bis zum Zonen-Text „Ins Bein… und nochmal!" |
+| Miracle: Session-Regel korrekt, Result feiert es | ✅ | E2E: erzwungenes Wunder mit drei Spielern — Scoreboard bleibt bei null, „LEGENDE"-Badge, Gold-Konfetti, Chor. Im Verteiler-Modus trinken alle 1 (unit-getestet). |
+| Wunder-Rate 1 von 40 | ✅ | über 40 000 Ziehungen gemessen, und die Gegenprobe zeigt: die Rate hängt **nicht** an der Zahl der übrigen Sequenzen (ADR-32) |
+| Alle Sequenzen sauber gegen Rig-Reset | ✅ | siehe oben |
+| Video aller Tode | ✅ ersetzt | Kontaktbögen statt Video (ADR-27): acht Frames pro Sequenz nebeneinander. Ohne Encoder im System kein Video — und zum Vergleichen der Key-Frames ohnehin besser. |
+
+### Standing Audit
+
+| Check | Wert |
+|---|---|
+| `npm run typecheck` | 0 Fehler |
+| `npm run lint` | 0 Fehler, 0 Warnings |
+| `npm run test:unit` | **348** grün, 0 todo |
+| `npm run test:e2e` | **38** grün auf iPhone 12 (WebKit) + Pixel 5 |
+| `npm run test:perf` | 4 grün · p50 16,7 ms · p95 17,6 ms · **0 Long-Tasks** · JS-Zeit p95 0,90 ms |
+| Draw-Calls | 5 (Arena 1 + Scope), unverändert seit M3 |
+| Heap über 30 s | +674 KB |
+| Bundle | 241 KB JS gzip (Budget 450), Atlas @2x 218 KB |
+
+### Die Fehler dieses Meilensteins
+
+Über M4a bis M4c waren es neun. Vier davon hätte kein Test der Welt gefunden, weil sie
+Gestaltung betreffen — die stehen in den Zwischenberichten. Drei waren echte Programmfehler,
+die lautlos gewesen wären:
+
+1. **Nach `body_deflate` blieb das Männchen für immer platt.** `reset()` stellte alles
+   wieder her ausser der Skalierung. Die nächste Runde hätte mit einem plattgedrückten
+   Shotling begonnen. Mein eigener Reset-Test hat es übersehen — er prüfte die Skalierung
+   nicht. Beides behoben.
+2. **`miss_then_hit` liess das Opfer am Leben.** Der Zustand wurde nie auf `dead` gesetzt:
+   Das Männchen wäre nach der Runde weitergelaufen, während der Result-Screen es für tot
+   erklärt. Der Fehler war naheliegend, weil das Opfer hier absichtlich erst **spät** stirbt.
+3. **Das Erdloch klebte am Körper statt am Boden** und landete beim kopfüber Steckenden
+   über dessen Füssen.
+
+Dazu drei Test-Reparaturen, die alle dasselbe Muster hatten: **Der Test war zu eng gefasst,
+nicht der Code kaputt.** Der JS-Zeit-Test verlangte mehr Frames, als ein Runner ohne GPU
+liefern kann. Der Dauer-Preset-Test mass inklusive Todesanimation, die seit M4a variabel
+ist. Und in jedem vollen E2E-Lauf fiel ein *anderer* Test durch — bis sich zeigte, dass ein
+parallel offener Browser-Tab mit laufender Arena den Tests die CPU wegnahm. Danach: 38 von
+38 grün.
+
+**Offene SOLL-Follow-ups:**
+- Low-Effects-Auslösung bei CPU-Drossel 6× erneut prüfen (Übertrag aus A2)
+- Wipe-Performance im DevTools-Panel gegenmessen (Übertrag aus A1)
+
+**Der eine Check, den nur Menschen machen können:**
+- [ ] **Der „Lustig-Test".** Drei Personen sehen jede Sequenz einmal — bei mindestens zwei
+      soll es zünden. `npm run preview:deaths` öffnet die Vorschau mit allen dreizehn im
+      Dropdown. Interessant sind vor allem die drei mit Timing-Risiko: `body_dramatic`
+      (doppeltes Aufstehen), `butt_rocket` (die leere Sekunde) und `leg_hop` (wie lange das
+      Reticle verfolgt). Sag, welche zu lang, zu kurz oder unverständlich ist — das ist der
+      Input für M5.
+
+**Zum Anschauen:** `docs/screens/m4a-*.png`, `m4b-*.png`, `m4c-miracle_dodge.png` und
+`m4c-result-miracle.png`.

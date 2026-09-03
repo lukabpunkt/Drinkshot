@@ -9,7 +9,7 @@
  * in vier aufeinanderfolgenden Runden nicht wiederholen (GDD §10.4).
  */
 
-import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW } from '@/config/rules';
+import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW, MIRACLE_CHANCE } from '@/config/rules';
 import type { SeededRng } from '@/core/rng';
 import type { DeathId, DeathZone } from '@/core/session';
 import type { Arena } from '../Arena';
@@ -112,19 +112,32 @@ export interface PickDeathOptions {
 }
 
 /**
- * Gewichtete Auswahl mit No-Repeat-Fenster.
+ * Auswahl der Todesanimation.
  *
- * Das Fenster greift nur, solange genug Sequenzen registriert sind — sonst hätte man in
- * M3 mit einer einzigen Animation gar keine Auswahl mehr.
+ * Das Wunder läuft **nicht** über die Gewichte: Das GDD schreibt „1 von 40 Runden" fest
+ * (§4.1), und ein Gewicht müsste bei jeder neuen Sequenz nachgerechnet werden, um dieselbe
+ * Seltenheit zu behalten. Stattdessen wird die Chance zuerst gewürfelt; erst danach geht
+ * es in die gewichtete Auswahl unter den übrigen.
+ *
+ * Das No-Repeat-Fenster greift nur, solange genug Sequenzen registriert sind — sonst hätte
+ * man mit wenigen Animationen gar keine Auswahl mehr.
  */
 export function pickDeath(options: PickDeathOptions): DeathSequence {
   const all = options.pool ?? allDeaths();
   if (all.length === 0) throw new Error('Keine DeathSequence registriert.');
 
   const allowMiracles = options.miracles ?? true;
-  let candidates: DeathSequence[] = all.filter(
-    (sequence) => allowMiracles || sequence.zone !== 'miracle'
-  );
+  const miracles = all.filter((sequence) => sequence.zone === 'miracle');
+
+  if (allowMiracles && miracles.length > 0 && options.rng.chance(MIRACLE_CHANCE)) {
+    const eligibleMiracles = miracles.filter(
+      (sequence) => !sequence.isEligible || (options.context && sequence.isEligible(options.context))
+    );
+    const pool = eligibleMiracles.length > 0 ? eligibleMiracles : miracles;
+    return options.rng.weighted(pool, (sequence) => sequence.weight);
+  }
+
+  let candidates: DeathSequence[] = all.filter((sequence) => sequence.zone !== 'miracle');
   if (candidates.length === 0) candidates = [...all];
 
   // Voraussetzungen prüfen (z. B. „trägt einen Hut").

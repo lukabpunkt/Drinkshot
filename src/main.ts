@@ -15,7 +15,7 @@ import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
 import { createFsm, type GameState, type Transition } from '@/core/fsm';
 import { createRoundSetup, createSessionStore, resolveRound } from '@/core/session';
-import { pickDeath } from '@/game/deaths/DeathSequence';
+import { getDeath, pickDeath } from '@/game/deaths/DeathSequence';
 import { registerAllDeaths } from '@/game/deaths';
 import { arenaLayout, arenaUpdateTimes, preloadArenaAssets } from '@/game/ArenaApp';
 import { confirmSheet } from '@/ui/components/sheet';
@@ -66,12 +66,19 @@ const fsm = createFsm({
    */
   drawRound: (bets, mode, duration) =>
     createRoundSetup(bets, mode, duration, (rng) => {
-      const recent = session.state.rounds.slice(-4).map((round) => round.deathId);
-      const sequence = pickDeath({
-        rng,
-        recent,
-        miracles: session.state.settings.miracles,
-      });
+      /*
+       * `?dev=1&death=<id>` erzwingt eine bestimmte Sequenz. Gebraucht wird das für
+       * Tests und für den Blick auf seltene Ausgänge: Auf das Wunder müsste man sonst
+       * im Schnitt vierzig Runden warten.
+       */
+      const forced = dev ? getDeath(params.get('death') ?? '') : undefined;
+      const sequence =
+        forced ??
+        pickDeath({
+          rng,
+          recent: session.state.rounds.slice(-4).map((round) => round.deathId),
+          miracles: session.state.settings.miracles,
+        });
       return { deathId: sequence.id, zone: sequence.zone };
     }),
   ...(dev

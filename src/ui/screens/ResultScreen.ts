@@ -7,8 +7,9 @@
  */
 
 import { MIN_PLAYERS } from '@/config/rules';
-import { colorById, hex } from '@/config/theme';
+import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { plural, t } from '@/core/i18n';
+import * as audio from '@/audio/AudioManager';
 import type { RoundResult } from '@/core/session';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { createButton } from '@/ui/components/button';
@@ -18,13 +19,24 @@ import { openModeSheet } from './SettingsSheet';
 
 const CONFETTI_COUNT = 40;
 
+/**
+ * Zonen-Icons (Roadmap M4.5). Jedes zeigt, **wo** getroffen wurde — die Silhouette eines
+ * Shotlings mit markierter Stelle, damit man es ohne Text versteht.
+ */
 const ZONE_ICONS: Record<string, string> = {
-  head: '<circle cx="12" cy="9" r="5.5"/><path d="M6 21c.7-3.6 3-5.5 6-5.5s5.3 1.9 6 5.5"/>',
-  body: '<path d="M12 3.5 15.5 6h2.8L20 10l-2.5 1.2V21h-11v-9.8L4 10l1.7-4h2.8z"/>',
-  leg: '<path d="M10 3h4v7l3 11h-4l-1.8-7L9 21H5l3-9z"/>',
-  butt: '<path d="M5 9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 9c0 4-3.1 7-7 7s-7-3-7-7z"/>',
-  miss: '<circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/>',
-  miracle: '<path d="m12 3.5 2.4 5.2 5.6.7-4.2 3.9 1.1 5.6-4.9-2.8-4.9 2.8 1.1-5.6L4 9.4l5.6-.7z"/>',
+  // Kopf mit Einschlag-Stern daneben
+  head: '<circle cx="10" cy="8" r="5"/><path d="M6 20c0-3.3 1.8-5 4-5s4 1.7 4 5"/><path d="m18 4 1.2 2.4L22 6.8l-2 1.9.5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-1.9 2.8-.4z"/>',
+  // Torso mit Treffer in der Mitte
+  body: '<circle cx="12" cy="5" r="3"/><path d="M8 10h8v7H8z"/><circle cx="12" cy="13.5" r="1.8" fill="currentColor"/><path d="M9 17v4M15 17v4"/>',
+  // Ein Bein hervorgehoben
+  leg: '<circle cx="12" cy="4.5" r="2.6"/><path d="M9 9h6v6H9z"/><path d="M10.5 15v6"/><path d="M13.5 15v6" stroke-dasharray="2 2"/>',
+  // Von hinten getroffen
+  butt: '<circle cx="12" cy="4.5" r="2.6"/><path d="M9 9h6v5H9z"/><path d="M8 14.5c0 2.5 1.8 4 4 4s4-1.5 4-4"/><path d="M19 12l3 3m0-3-3 3"/>',
+  // Danebengeschossen: Ziel plus abgelenkter Pfeil
+  miss: '<circle cx="9" cy="12" r="6"/><circle cx="9" cy="12" r="2"/><path d="M15 5 22 12"/><path d="M19 5h3v3"/>',
+  // Wunder: Stern mit Strahlen
+  miracle:
+    '<path d="m12 3 2 4.4 4.8.6-3.6 3.3 1 4.8L12 13.7 7.8 16.1l1-4.8L5.2 8l4.8-.6z"/><path d="M4 19.5 5.5 21M20 19.5 18.5 21M12 19.5V22"/>',
 };
 
 function zoneIcon(zone: string): string {
@@ -59,7 +71,14 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   const victim = ctx.session.playerById(round.victimId);
   const victimColor = victim ? colorById(victim.colorId) : colorById('red');
-  el.style.setProperty('--result-color', hex(victimColor.hex));
+  const isMiracle = round.zone === 'miracle';
+
+  /*
+   * Beim Wunder wird nicht in der Farbe des Opfers gefeiert, sondern in Gold: Es ist der
+   * seltenste Ausgang des Spiels (1 von 40 Runden) und soll sich auch so anfühlen.
+   */
+  el.style.setProperty('--result-color', hex(isMiracle ? UI_COLORS.accent : victimColor.hex));
+  if (isMiracle) el.classList.add('screen--result-miracle');
 
   const confetti = document.createElement('div');
   confetti.className = 'result__confetti';
@@ -75,6 +94,13 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
   const zoneText = document.createElement('span');
   zoneText.textContent = t(`result.zone.${round.zone}`);
   zone.append(zoneText);
+
+  if (isMiracle) {
+    const badge = document.createElement('p');
+    badge.className = 'result__legend';
+    badge.textContent = t('result.miracleBadge');
+    reveal.append(badge);
+  }
 
   if (victim) {
     reveal.append(createPlayerBadge({ colorId: victim.colorId, size: 'lg' }));
@@ -153,7 +179,13 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
     el,
     activate() {
       vibrate('reveal');
-      spawnConfetti(confetti, hex(victimColor.hex), hex(victimColor.shade));
+      if (isMiracle) {
+        audio.play('miracle_choir');
+        spawnConfetti(confetti, hex(UI_COLORS.accent), hex(UI_COLORS.accentShade), 70);
+      } else {
+        audio.play('fanfare_result');
+        spawnConfetti(confetti, hex(victimColor.hex), hex(victimColor.shade));
+      }
       headline.animate(
         [
           { transform: 'scale(0.7)', opacity: 0 },
@@ -301,11 +333,11 @@ function createScoreboard(ctx: ScreenContext): HTMLElement {
   return wrapper;
 }
 
-/** CSS-Konfetti in der Farbe des Opfers (GDD §6.5). */
-function spawnConfetti(host: HTMLElement, color: string, shade: string): void {
+/** CSS-Konfetti in der Farbe des Opfers, beim Wunder in Gold (GDD §6.5). */
+function spawnConfetti(host: HTMLElement, color: string, shade: string, count = CONFETTI_COUNT): void {
   if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   const fragment = document.createDocumentFragment();
-  for (let index = 0; index < CONFETTI_COUNT; index++) {
+  for (let index = 0; index < count; index++) {
     const piece = document.createElement('i');
     piece.className = 'result__confettiPiece';
     piece.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);

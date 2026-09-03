@@ -6,8 +6,9 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW } from '@/config/rules';
+import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW, MIRACLE_CHANCE } from '@/config/rules';
 import { createSeededRng } from '@/core/rng';
+import { t } from '@/core/i18n';
 import { DEATH_ZONES } from '@/core/session';
 import {
   allDeaths,
@@ -100,6 +101,42 @@ describe('Auswahl', () => {
     }
   });
 
+  /*
+   * GDD §4.1: „Rarität, 1 von 40 Runden". Die Seltenheit hängt an `MIRACLE_CHANCE`, nicht
+   * an einem Gewicht — sonst müsste man sie bei jeder neuen Sequenz nachrechnen.
+   */
+  it(`trifft die Wunder-Rate von 1 zu ${Math.round(1 / MIRACLE_CHANCE)}`, () => {
+    const pool = [
+      ...Array.from({ length: 11 }, (_, i) => fake(`d${i}`, 10)),
+      fake('wunder', 1, 'miracle'),
+    ];
+    const rng = createSeededRng(20260904);
+    const draws = 40_000;
+    let miracles = 0;
+    for (let i = 0; i < draws; i++) {
+      if (pickDeath({ rng, pool }).zone === 'miracle') miracles++;
+    }
+    const rate = miracles / draws;
+    expect(
+      Math.abs(rate - MIRACLE_CHANCE),
+      `gemessen 1 zu ${(1 / rate).toFixed(1)}`
+    ).toBeLessThan(0.005);
+  });
+
+  it('die Wunder-Rate hängt nicht an der Zahl der übrigen Sequenzen', () => {
+    // Gegenprobe: Mit doppelt so vielen normalen Sequenzen bleibt die Rate gleich.
+    const many = [
+      ...Array.from({ length: 30 }, (_, i) => fake(`d${i}`, 10)),
+      fake('wunder', 1, 'miracle'),
+    ];
+    const rng = createSeededRng(4711);
+    let miracles = 0;
+    for (let i = 0; i < 40_000; i++) {
+      if (pickDeath({ rng, pool: many }).zone === 'miracle') miracles++;
+    }
+    expect(Math.abs(miracles / 40_000 - MIRACLE_CHANCE)).toBeLessThan(0.005);
+  });
+
   it('fällt auf den ganzen Pool zurück, wenn nur Wunder registriert sind', () => {
     const pool = [fake('nur_wunder', 10, 'miracle')];
     expect(pickDeath({ rng: createSeededRng(1), pool, miracles: false }).id).toBe('nur_wunder');
@@ -164,7 +201,7 @@ describe('Vollständigkeit', () => {
    * Dauer, Endzustand und Reset prüft `deaths.test.ts` pro Sequenz — dort steht der
    * Harness mit echtem Rig. Hier bleibt, was die Registry als Ganzes betrifft.
    */
-  it('registriert Kopf- und Brust-Zone vollständig (M4a)', () => {
+  it('registriert alle zwölf Sequenzen aus GDD §4.1', () => {
     registerAllDeaths();
     const byZone = new Map<string, string[]>();
     for (const sequence of allDeaths()) {
@@ -181,6 +218,13 @@ describe('Vollständigkeit', () => {
       'body_dramatic',
       'body_freeze_shatter',
     ]);
+    expect(byZone.get('leg')?.sort()).toEqual(['leg_hop', 'leg_spin']);
+    expect(byZone.get('butt')?.sort()).toEqual(['butt_hotfoot', 'butt_rocket']);
+    expect(byZone.get('miss')).toEqual(['miss_then_hit']);
+    expect(byZone.get('miracle')).toEqual(['miracle_dodge']);
+
+    // GDD §10.4 verlangt mindestens 12 unterschiedliche Tode.
+    expect(allDeaths().length).toBeGreaterThanOrEqual(12);
   });
 
   it('jede registrierte Sequenz hat ein positives Gewicht', () => {
@@ -190,7 +234,12 @@ describe('Vollständigkeit', () => {
     }
   });
 
-  it.todo('M4b: leg_hop, leg_spin, butt_rocket, butt_hotfoot, miss_then_hit');
-  it.todo('M4c: miracle_dodge samt Session-Regel und Result-Feier');
-  it.todo('alle 12 DeathIds aus GDD §4.1 sind registriert');
+  it('jede Zone hat einen Text auf dem Result-Screen', () => {
+    registerAllDeaths();
+    for (const sequence of allDeaths()) {
+      const text = t(`result.zone.${sequence.zone}`);
+      expect(text, `Zonen-Text für ${sequence.zone} fehlt`).not.toContain('[missing:');
+      expect(text.trim()).not.toBe('');
+    }
+  });
 });

@@ -1,8 +1,8 @@
 /**
  * Registrierung aller Todesanimationen.
  *
- * M4a lieferte Kopf und Brust, M4b Bein, Po und Miss. Nur `miracle_dodge` fehlt noch
- * (M4c) — die Registry prüft beim Eintragen auf doppelte IDs.
+ * Alle zwölf Sequenzen aus GDD §4.1 plus `basic_fall`. Die Registry prüft beim Eintragen
+ * auf doppelte IDs; die Auswahl steckt in `pickDeath`.
  */
 
 import { registerDeath } from './DeathSequence';
@@ -18,6 +18,7 @@ import { legSpin } from './leg/Spin';
 import { buttRocket } from './butt/Rocket';
 import { buttHotfoot } from './butt/Hotfoot';
 import { missThenHit } from './miss/MissThenHit';
+import { miracleDodge } from './miracle/Dodge';
 
 let registered = false;
 
@@ -36,6 +37,7 @@ export function registerAllDeaths(): void {
   registerDeath(buttRocket);
   registerDeath(buttHotfoot);
   registerDeath(missThenHit);
+  registerDeath(miracleDodge);
 
   /*
    * `basic_fall` bleibt registriert, bis alle zwölf stehen. Sein Gewicht ist bewusst
@@ -43,7 +45,6 @@ export function registerAllDeaths(): void {
    */
   registerDeath(basicFall);
 
-  // TODO(M4c): miracle_dodge
 }
 
 /** Nur für Tests: erlaubt erneutes Registrieren nach `clearDeathRegistry()`. */

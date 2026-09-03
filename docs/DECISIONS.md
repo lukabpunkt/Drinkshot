@@ -102,3 +102,9 @@ Kontext: Die A4-Kriterien gelten für jede Todesanimation. Eine gepflegte Testli
 
 ## ADR-31 · 2026-09-04 · Playwright wartet zehn statt fünf Sekunden
 Kontext: In jedem vollen E2E-Lauf fiel ein anderer Test durch; isoliert liefen alle stabil. Ursache war Ressourcenmangel — ein parallel laufender Dev-Server mit offener Arena. Entscheidung: Die Standard-Wartezeit steht auf 10 s. Konsequenz: Bei einer App, in der fast jede Zusicherung hinter einer Animation hängt (320 ms Wipe, 260 ms Sheet, Arena-Aufbau), sind fünf Sekunden auf einem CI-Runner mit zwei Kernen zu knapp; zehn Sekunden finden echte Hänger immer noch.
+
+## ADR-32 · 2026-09-04 · Die Wunder-Rate hängt an einer Konstante, nicht an einem Gewicht
+Kontext: GDD §4.1 schreibt „1 von 40 Runden" fest. Über die gewichtete Auswahl gelöst, müsste das Gewicht bei jeder neuen Sequenz nachgerechnet werden, um dieselbe Seltenheit zu behalten — und niemand würde daran denken. Entscheidung: `pickDeath` würfelt zuerst `MIRACLE_CHANCE`; erst danach geht es in die gewichtete Auswahl unter den übrigen. Konsequenz: Die Rate bleibt bei 1 zu 40, egal wie viele Sequenzen dazukommen — über 40 000 Ziehungen gemessen, mit Gegenprobe bei dreifacher Sequenzzahl.
+
+## ADR-33 · 2026-09-04 · `?dev=1&death=<id>` erzwingt eine Sequenz
+Kontext: Seltene Ausgänge sind schwer zu prüfen — auf ein Wunder wartet man im Schnitt vierzig Runden, also über zehn Minuten Spielzeit pro Testlauf. Entscheidung: Im Dev-Modus überschreibt ein URL-Parameter die Auswahl. Konsequenz: Der E2E-Test prüft die Wunder-Regel in 26 Sekunden statt gar nicht, und beim Debuggen lässt sich jede Sequenz gezielt in einer echten Runde ansehen — nicht nur in der Vorschau.

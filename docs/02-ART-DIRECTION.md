@@ -28,7 +28,7 @@ export const PLAYER_COLORS = [
   { id: 'blue', hex: 0x3b82f6, shade: 0x1e5bb8, symbol: 'triangle' },
   { id: 'green', hex: 0x2ed573, shade: 0x1e9e52, symbol: 'square' },
   { id: 'yellow', hex: 0xffd32a, shade: 0xd4a800, symbol: 'star' },
-  { id: 'purple', hex: 0xa55eea, shade: 0x7b3fbf, symbol: 'diamond' },
+  { id: 'purple', hex: 0xaf73ee, shade: 0x7b3fbf, symbol: 'diamond' },
   { id: 'orange', hex: 0xff7f50, shade: 0xcc5a2e, symbol: 'heart' },
   { id: 'pink', hex: 0xff6b9d, shade: 0xc94a78, symbol: 'bolt' },
   { id: 'cyan', hex: 0x18dcff, shade: 0x0fa6c2, symbol: 'cross' },

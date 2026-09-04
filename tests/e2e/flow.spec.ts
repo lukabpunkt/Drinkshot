@@ -118,11 +118,24 @@ test('kompletter Flow: 4 Spieler, 2 Runden', async ({ page }) => {
   await playRound(page, [4, 4, 4, 4]);
 
   await expect(page.locator('.result__headline')).toContainText('trinkt 4');
-  // Scoreboard zählt über beide Runden.
+  /*
+   * Scoreboard zählt über beide Runden. Die sichtbare Zahl läuft dorthin erst hoch
+   * (Roadmap M5.3) — der Endwert steht aber sofort im `aria-label`, weil ein
+   * Screenreader keine Zwischenstände vorlesen soll. Genau den liest der Test.
+   */
   const scoreSum = await page.locator('.score__value').evaluateAll((nodes) =>
-    nodes.reduce((sum, node) => sum + Number(node.textContent), 0)
+    nodes.reduce((sum, node) => sum + Number(node.getAttribute('aria-label')), 0)
   );
   expect(scoreSum).toBeGreaterThan(4);
+
+  // Und nach dem Zählen stimmt auch, was dasteht.
+  await expect
+    .poll(async () =>
+      page
+        .locator('.score__value')
+        .evaluateAll((nodes) => nodes.reduce((sum, node) => sum + Number(node.textContent), 0))
+    )
+    .toBe(scoreSum);
 
   expect(errors).toEqual([]);
 });

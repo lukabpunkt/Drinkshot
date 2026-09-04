@@ -30,9 +30,17 @@ export function countUp(
   options: { durationMs?: number; delayMs?: number; format?: (n: number) => string } = {}
 ): () => void {
   const format = options.format ?? ((n: number) => String(n));
+  const final = format(value);
+
+  /*
+   * Der Endwert steht sofort als zugänglicher Name da. Sonst läse ein Screenreader die
+   * Zwischenstände mit — oder, schlimmer, einen zufälligen davon. Sichtbar zählt es
+   * trotzdem hoch: Die Animation ist für die Augen, die Zahl für alle.
+   */
+  el.setAttribute('aria-label', final);
 
   if (prefersReducedMotion() || value === 0) {
-    el.textContent = format(value);
+    el.textContent = final;
     return () => undefined;
   }
 
@@ -53,7 +61,8 @@ export function countUp(
     const progress = Math.min(1, elapsed / duration);
     // easeOutCubic — schnell los, sanft ins Ziel.
     const eased = 1 - (1 - progress) ** 3;
-    el.textContent = format(Math.round(value * eased));
+    // Der letzte Frame setzt den formatierten Endwert, nicht die gerundete Näherung.
+    el.textContent = progress < 1 ? format(Math.round(value * eased)) : final;
     if (progress < 1) frame = requestAnimationFrame(step);
   };
 

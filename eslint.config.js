@@ -55,6 +55,12 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.node,
+        /*
+         * Manche Skripte steuern einen Browser (`measure-title-heap.mjs`): Der Code in
+         * `page.evaluate(...)` laeuft dort, nicht in Node — `window` und `document` sind
+         * darin echte Globals.
+         */
+        ...globals.browser,
       },
     },
     rules: {

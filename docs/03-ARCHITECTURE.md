@@ -95,6 +95,7 @@ Drinkshot/
 │  │  │  ├─ SpeechBubble.ts
 │  │  │  └─ Tombstone.ts
 │  │  └─ deaths/
+│  │     ├─ catalog.ts           # Metadaten aller Sequenzen, **ohne PIXI-Import** (ADR-35)
 │  │     ├─ DeathSequence.ts     # Interface + Registry + Auswahl (Zone, No-Repeat)
 │  │     ├─ head/HelmetSpin.ts, HatLaunch.ts, Xray.ts
 │  │     ├─ body/Dramatic.ts, Deflate.ts, FreezeShatter.ts
@@ -240,7 +241,8 @@ type Beat =
 2. Scan: Permutation aller Spieler (Fisher-Yates, seeded), jeder 1× mit `holdMs ∈ [600,1200]`.
 3. Panic: `k` Beats mit `holdMs ∈ [300,700]`, Ziel zufällig, aber **nie zweimal hintereinander gleich** und **Opfer-Anteil ≤ 1/n + 5 %** (Fairness-Check im Unit-Test).
 4. Fake-Locks: 1 (short) / 2 (normal/long). Das **letzte** Fake ist der letzte Beat vor dem Lock und nie das Opfer (maximale Fallhöhe). Frühere Fakes dürfen das Opfer treffen — sonst hängt es systematisch kürzer im Fadenkreuz als alle anderen (ADR-19).
-5. Lock auf Opfer, dann `shot`, dann `death` (bei Leg-/Miss-Deaths enthält die DeathSequence selbst den zweiten Schuss).
+5. Lock auf Opfer, dann `shot`, dann `death` (bei Leg-/Miss-Deaths enthält die DeathSequence selbst den zweiten Schuss). Der `death`-Beat traegt sein Opfer selbst, damit **Double Tap** mehrere Tode in einem Drehbuch beschreiben kann (ADR-37).
+6. **Double Tap**: Nach dem ersten Tod ein Nachschlag ohne neuen Aufbau — Ruck (500 ms), Lock (900 ms), Schuss, eigene Sequenz. Das Dauer-Preset beschreibt nur den Aufbau bis zum **ersten** Schuss; der Nachschlag zaehlt nicht mit.
 6. Bei 2 Spielern: min. 4 Aim-Beats in Panic erzwingen.
 
 Der `ShowDirector` spielt das Skript mit einer **GSAP-Timeline** ab (ein Timeline-Objekt, `pause/resume` bei Tab-Wechsel → `visibilitychange`). Slow-Mo läuft **nicht** über die Show-Timeline, sondern über `Camera.timeScale`, das den Zeitschritt von Männchen und Partikeln skaliert — sonst dehnt sich die Lock-Phase und die Dauer-Presets stimmen nicht mehr (ADR-21).
@@ -261,16 +263,26 @@ interface DeathContext {
   arena: Arena;
 }
 
-interface DeathSequence {
+/** Metadaten — steht in `deaths/catalog.ts` und importiert **nichts** (ADR-35). */
+interface DeathMeta {
   id: DeathId;
   zone: 'head' | 'body' | 'leg' | 'butt' | 'miss' | 'miracle';
   weight: number; // Auswahl-Gewicht (miracle sehr klein)
   needsSecondShot: boolean;
+  /** Braucht einen Hut mit Krempe; die Arena setzt dem Opfer einen auf (ADR-34). */
+  requiresHat?: boolean;
+}
+
+interface DeathSequence extends DeathMeta {
   build(ctx: DeathContext): gsap.core.Timeline; // liefert fertige Timeline inkl. Sound-Cues
 }
 ```
 
-- Registry: `deaths/index.ts` exportiert alle. Auswahl: gewichtete Zufallswahl mit `SeededRng`, **No-Repeat-Fenster 4** (die letzten 4 Deaths der Session sind ausgeschlossen, solange ≥ 8 verfügbar).
+- **Katalog und Implementierung sind getrennt** (ADR-35): `catalog.ts` haelt die Metadaten und
+  importiert nichts, damit die Ziehung ohne den Renderer laufen kann — Voraussetzung dafuer,
+  dass der Arena-Chunk nachgeladen wird (ADR-36). `pickDeath` arbeitet auf `DEATH_CATALOG`;
+  ein Unit-Test haelt Katalog und Registry deckungsgleich.
+- Registry: `deaths/index.ts` exportiert alle. Auswahl: gewichtete Zufallswahl mit `SeededRng`, **No-Repeat-Fenster 4** (die letzten 4 Deaths der Session sind ausgeschlossen, solange ≥ 8 verfügbar). Die Wunder-Rate haengt an `MIRACLE_CHANCE`, nicht am Gewicht (ADR-32).
 - Jede Sequenz bekommt einen **Unit-Test**, der `build()` aufruft und prüft: Timeline-Dauer innerhalb 1.5–4.5 s, endet mit `victim.state === 'dead'` (außer miracle), keine Exceptions.
 - Jede Sequenz hat einen **Dev-Preview-Eintrag** (siehe 9. Dev-Tools), damit man sie einzeln ansehen kann.
 
@@ -290,6 +302,11 @@ interface DeathSequence {
 10. Budget pro Frame: Update ≤ 4 ms, Render ≤ 8 ms auf Referenzgerät (Pixel 4a).
 11. Keine Allokationen im Loop (keine Closures/Arrays pro Frame in `update()`); Vektoren wiederverwenden.
 12. Assets: Preload aller Arena-Assets **während der Betting-Phase** (die dauert ohnehin ≥ 10 s) mit `PIXI.Assets.backgroundLoad`.
+13. **Code-Splitting** (ADR-36): Der Arena-Screen — und mit ihm PIXI, GSAP, die Filter und alle
+    Todesanimationen — wird per `import()` nachgeladen und schon beim Betreten der **Lobby**
+    vorgeladen. Der Einstieg laedt damit 21 statt 159 KB gzip. `main.ts` darf deshalb
+    **nichts** aus `game/` statisch importieren ausser `deaths/catalog.ts` (das nichts
+    importiert); die CI bricht ab, wenn `ArenaScreen` in `index.html` auftaucht.
 
 ---
 

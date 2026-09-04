@@ -573,3 +573,135 @@ parallel offener Browser-Tab mit laufender Arena den Tests die CPU wegnahm. Dana
 
 **Zum Anschauen:** `docs/screens/m4a-*.png`, `m4b-*.png`, `m4c-miracle_dodge.png` und
 `m4c-result-miracle.png`.
+
+---
+
+## M5 — Polish, Modi, Juice & Accessibility (2026-09-04)
+
+Der Meilenstein hatte zwei Schwerpunkte, die auf den ersten Blick nichts miteinander zu
+tun haben und sich dann gegenseitig bestimmten: **den Start leicht machen** und **die
+Runde fertig machen**. Beides lief auf dieselbe Frage hinaus — was muss wirklich da sein,
+bevor jemand zum ersten Mal tippt?
+
+### Was gebaut wurde
+
+**Der Arena-Code wird nachgeladen.** PIXI, GSAP, die Filter und alle dreizehn
+Todesanimationen lagen im Einstiegs-Chunk, obwohl bis zum ersten Schuss nur Menüs zu sehen
+sind: 159 KB gzip, die niemand braucht, während er Namen eintippt. Die Ziehung des Todes
+hing daran, weil sie über die Registry der fertigen Sequenzen lief. Jetzt hält
+`deaths/catalog.ts` nur die Metadaten (ADR-35), der Screen kommt per `import()` und wird
+beim Betreten der **Lobby** vorgeladen, die Atlanten wie bisher beim **Pass** (ADR-36).
+
+| | vorher | nachher |
+|---|---|---|
+| Einstiegs-Chunk | 159,00 KB gzip | **21,2 KB gzip** |
+| Arena-Chunk | (im Einstieg) | 138,2 KB gzip, lazy |
+| JS gesamt | 241 KB | 249 KB |
+
+Das Gesamtvolumen wächst leicht — Code-Splitting kostet ein paar Byte Modul-Verwaltung.
+Der Punkt ist nicht die Summe, sondern was vor dem ersten Bild geladen wird: **28 KB
+gzip** (JS + CSS) statt 165.
+
+**Double Tap erschiesst jetzt beide Opfer.** Der Kern liess seit M1 zwei Leute trinken,
+die Show traf aber nur einen — das zweite Opfer stand nach der Runde unversehrt da und
+sollte trinken. Ein zweiter vollständiger Aufbau kam nicht in Frage: Die Spannung ist mit
+dem ersten Schuss verbraucht, ein zweiter Scan würde sie nicht wiederholen, sondern
+langweilen. Der Nachschlag ist deshalb ein Ruck aufs nächste Ziel (500 ms), Lock (900 ms),
+Schuss, eigene Sequenz (ADR-37). Der Aufbau bis zum ersten Schuss bleibt exakt so lang wie
+das Preset sagt, und die Fairness-Bilanz vor dem Lock ist unverändert — beides ist
+getestet.
+
+**Der Titel-Loop ist CSS, nicht PIXI** (ADR-38). Die Roadmap sah eine echte Arena-Instanz
+vor; die hätte den Renderer beim Start geladen und den Split von oben aufgehoben — 159 KB
+für einen Gag, der vor dem ersten Tap läuft. Stattdessen ein Inline-SVG in der
+Rig-Sprache mit CSS-Keyframes: Laufzyklus, einfahrendes Fadenkreuz, Blitz, Umkippen mit
+Anticipation und Overshoot.
+
+Dazu: Zahlen und Balken im Result zählen versetzt hoch, die Haptik pulsiert im Lock im
+Herzschlag-Takt (eigener Timer, damit sie auch bei stummem Gerät trägt), zwei einmalige
+Hinweise in der ersten Runde, und Ladefehler enden in einem Toast mit „Nochmal versuchen"
+statt in einem schwarzen Bild.
+
+### Audit A5 — 2026-09-04
+
+**Ergebnis:** BESTANDEN
+
+| Check | Status | Notiz |
+| --- | --- | --- |
+| Lighthouse Mobile: Performance ≥ 90 | ✅ | **100** · FCP 1,3 s · LCP 1,6 s · TBT 0 ms · CLS 0 |
+| Lighthouse: Accessibility ≥ 90 | ✅ | **96** · ein verbleibender Befund, siehe unten |
+| Lighthouse: Best Practices ≥ 90 | ✅ | **100** |
+| PWA installierbar | ✅ | Manifest mit `any` + `maskable`, `display: standalone`, SW aktiv |
+| JS gzip ≤ 450 KB | ✅ | **249 KB**; CI bricht ab, wenn das Budget reisst |
+| Initial-Assets ≤ 1 MB | ✅ | 28 KB JS+CSS, 60 KB Fonts, 68 KB Icons; Atlanten (552 KB) erst ab PASS |
+| Arena-Chunk lazy | ✅ | nicht in `index.html` referenziert; CI prüft das mit |
+| Kontrast aller Textfarben ≥ 4.5:1 | ✅ | 25 Paare, schlechtestes 4,58:1 · `npm run check:contrast`, läuft in CI |
+| `prefers-reduced-motion` respektiert | ✅ | Titel-Loop still, Wipe wird Fade, Konfetti aus, Zähler springen auf den Endwert |
+| Tastatur-Navigation Titel→Lobby | ✅ (SOLL) | Tab erreicht alle drei Buttons, Enter wechselt, Fokus landet im neuen Screen |
+| EN vollständig, kein `[missing:` | ✅ | 127 Schlüssel je Sprache, deckungsgleich; DE und EN im E2E abgesucht |
+| Alle 4 Modi erklärt und spielbar | ✅ | jeder mit Namen und erklärendem Satz; Double Tap end-to-end belegt |
+| Sudden-Death-Ausscheiden sichtbar | ✅ | gedimmte Zeile mit „Ausgeschieden" in der Lobby |
+| Titel-Loop ohne Speicherleck (10 min) | ✅ | Heap **±0 KB**, DOM konstant 59 Knoten, 8 Animationen |
+| Haptik: Android spürbar, iOS still | ⏳ manuell | `navigator.vibrate` fehlt auf iOS — abgefangen, kein Fehler; Muster nur am Gerät beurteilbar |
+| Offline-Start nach Erstinstallation | ✅ (Chromium) | E2E: SW aktiv, Netz aus, Reload → Titelbild samt Loop. Unter WebKit uebersprungen — Playwright bricht dort beim Offline-Reload mit „internal error" ab, das ist die Testumgebung, nicht die App. Auf echtem iOS-Safari bleibt es ein manueller Check. |
+| Atlas-Fehler → Toast | ✅ | E2E: beide Versuche blockiert → Toast mit „Nochmal versuchen", Runde endet trotzdem im Result |
+
+**Der eine verbleibende Lighthouse-Befund** ist der Logo-Schriftzug: axe liest den 4 px
+dicken `-webkit-text-stroke` als Textfarbe, und Tinte auf fast-schwarzem Grund ergibt
+1,04:1. Gelesen wird aber die **Füllung** — Akzent auf Deep-BG, 11,03:1. Ich habe das
+nicht „wegoptimiert": Den Umriss zu entfernen würde die Sticker-Sprache aus der Art
+Direction aufgeben, um eine Heuristik zu bedienen, die hier danebenliegt. Accessibility
+steht mit 96 deutlich über der Grenze.
+
+**Zur Heap-Messung:** Chrome rundet `performance.memory` aus Datenschutzgründen auf etwa
+100 KB. „±0 KB" heisst also präziser: **Wachstum unterhalb der Messauflösung.** Die
+belastbareren Zahlen stehen daneben — DOM-Knoten und laufende Animationen blieben über
+zehn Minuten konstant, und der Loop hat weder Timer noch Frame-Schleife. Nachmessen:
+`node scripts/measure-title-heap.mjs <URL> <Minuten>`.
+
+### Die Fehler dieses Meilensteins
+
+1. **Der Hut-Block stand auch im Frame-Loop.** Beim Einbau der `requiresHat`-Logik landete
+   derselbe Abschnitt zweimal in `ArenaScreen` — einmal im Aufbau, einmal im Ticker. Dort
+   hätte er bei **jedem Frame** ein Array gebaut, was Architektur §7 ausdrücklich verbietet.
+   Gefunden beim Nachlesen des Diffs, nicht durch einen Test: Ein Test hätte ihn nicht
+   bemerkt, weil er funktional nichts kaputt macht.
+2. **Der Router nahm dem Pass-Screen die Tastatur.** Die neue Fokus-Führung setzte
+   `tabindex="-1"` auf jeden Screen — der Pass-Screen ist aber selbst eine grosse Taste mit
+   `tabindex="0"` und wäre so per Tastatur unerreichbar geworden. Jetzt wird nur gesetzt,
+   wo noch keiner steht.
+3. **Zwei echte Kontrast-Fehlschläge.** Papier auf der Danger-Fläche kam auf 3,44:1
+   (Knopf *und* Toast), Lila auf dem Panel auf 4,33:1. Beide standen seit M1 im Code und
+   sind keinem Blick aufgefallen — deshalb prüft das jetzt ein Skript in der CI, statt
+   einmalig axe.
+4. **`user-scalable=no` im Viewport.** Verhindert Pinch-Zoom komplett; das Doppeltipp-Zoom,
+   um das es eigentlich ging, unterbindet `touch-action: manipulation` ohnehin schon.
+   Alleine dieser Punkt kostete 10 von 100 Lighthouse-Punkten.
+5. **`Element.animate` gibt es in jsdom nicht** — und die Zeile stand nicht nur im Schmuck,
+   sondern auch dort, wo auf `.finished` gewartet wird. Fehlt die API, bricht dann nicht
+   die Animation ab, sondern der Ablauf dahinter (ADR-39).
+
+Dazu zwei Testfehler eigener Machung: Mein `addInitScript` leerte `localStorage` bei
+**jeder** Navigation und damit auch beim Reload — der Test „Sprache überlebt den Reload"
+warf weg, was er prüfen wollte. Und die Modus-Buttons melden sich als `aria-checked`
+(Radiogruppe), nicht als `aria-pressed`; da war der Test falsch, nicht der Code.
+
+**Offene SOLL-Follow-ups:**
+- Low-Effects-Auslösung bei CPU-Drossel 6× erneut prüfen (Übertrag aus A2)
+- Wipe-Performance im DevTools-Panel gegenmessen (Übertrag aus A1)
+- Arena-Themes (Roadmap M5.5, „nice-to-have") bewusst nicht gebaut — sie kosten Atlas-Fläche
+  und lösen kein Problem, das im Playtest aufgefallen wäre. Entscheidung für M6.
+
+**Manuelle Checks, die Luka bestätigen muss, bevor M6 startet:**
+- [ ] **Haptik am Gerät.** Auf Android: Pulsiert es im Lock spürbar im Herzschlag-Takt und
+      hört es mit dem Schuss auf? Auf dem iPhone: passiert einfach nichts (richtig so)?
+- [ ] **Der Titel-Loop.** Zündet der Gag — läuft, Fadenkreuz, Umkippen — oder wirkt er
+      neben dem Logo nur unruhig?
+- [ ] **Die zwei Hinweise in der ersten Runde.** Zu viel, zu wenig, oder genau richtig?
+      Der Bet-Hinweis steht direkt über der schon vorhandenen Zeile „Mehr Einsatz =
+      höheres Risiko" — ist das doppelt?
+- [ ] **Double Tap einmal spielen.** Kommt der Nachschlag überraschend oder wirkt er
+      angehängt? `Einstellungen → Modus → Double Tap`.
+- [ ] **Offline auf dem iPhone.** Seite einmal laden, zum Homescreen hinzufügen, Flugmodus
+      an, App öffnen. Unter Chromium ist das getestet; Playwright kann es unter WebKit
+      nicht, also muss es einmal ein Mensch am Gerät sehen.

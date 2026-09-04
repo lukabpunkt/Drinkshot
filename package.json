@@ -20,7 +20,8 @@
     "test:perf": "playwright test tests/e2e/perf.spec.ts",
     "build:atlas": "node scripts/build-atlas.mjs",
     "build:audio": "node scripts/build-audio-sprite.mjs",
-    "preview:deaths": "vite --host --open \"/?dev=1&panel=deaths\""
+    "preview:deaths": "vite --host --open \"/?dev=1&panel=deaths\"",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "gsap": "^3.13.0",

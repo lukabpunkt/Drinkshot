@@ -49,7 +49,7 @@ Eine **Session** = beliebig viele Runden mit derselben Spielergruppe. Es gibt ei
 | 2   | Blau   | `#3B82F6` | Blue                         |
 | 3   | Grün   | `#2ED573` | Gustav                       |
 | 4   | Gelb   | `#FFD32A` | Yoshi                        |
-| 5   | Lila   | `#A55EEA` | Lilo                         |
+| 5   | Lila   | `#AF73EE` | Lilo                         |
 | 6   | Orange | `#FF7F50` | Olli                         |
 | 7   | Pink   | `#FF6B9D` | Pinky                        |
 | 8   | Türkis | `#18DCFF` | Turbo                        |

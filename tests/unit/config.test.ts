@@ -69,7 +69,9 @@ describe('theme.ts gegen Art Direction §2', () => {
       'cyan',
     ]);
     expect(PLAYER_COLORS.map((c) => c.hex)).toEqual([
-      0xff4757, 0x3b82f6, 0x2ed573, 0xffd32a, 0xa55eea, 0xff7f50, 0xff6b9d, 0x18dcff,
+      // Lila wurde in M5 von #a55eea auf #af73ee aufgehellt: 4.33:1 auf dem Panel
+      // reissen die 4.5:1 aus Audit A5, jetzt sind es 5.23:1.
+      0xff4757, 0x3b82f6, 0x2ed573, 0xffd32a, 0xaf73ee, 0xff7f50, 0xff6b9d, 0x18dcff,
     ]);
   });
 

@@ -85,10 +85,15 @@
   --btn-text: var(--c-paper);
 }
 
+/*
+ * Tinte statt Papier auf der Danger-Fläche: Papier auf `--c-danger` kommt nur auf
+ * 3.44:1 und reisst damit die 4.5:1 aus Audit A5. Tinte darauf liegt bei 5.04:1 — und
+ * es sieht aus wie der Primary-Button, was für einen Knopf mit Folgen genau richtig ist.
+ */
 .btn--danger {
   --btn-face: var(--c-danger);
   --btn-edge: #b81f3d;
-  --btn-text: var(--c-paper);
+  --btn-text: var(--c-ink);
 }
 
 .btn--ghost {
@@ -478,11 +483,13 @@
   pointer-events: auto;
 }
 
+/* Wie beim Danger-Button: Tinte auf der Farbfläche, sonst reisst der Kontrast (A5). */
 .toast--danger {
   background: var(--c-danger);
-  color: var(--c-paper);
+  color: var(--c-ink);
 }
 
+/* Grün ist hell — auf hellem Grund braucht die Schrift Tinte, kein Papier. */
 .toast--success {
   background: var(--c-success);
   color: var(--c-ink);
@@ -557,7 +564,8 @@
   margin: 0;
   font-size: var(--fs-xs);
   letter-spacing: 0.08em;
-  color: rgb(255 248 231 / 30%);
+  /* 30 % kamen auf 2.56:1 — Text bleibt Text, auch wenn es nur die Version ist (A5). */
+  color: rgb(255 248 231 / 58%);
 }
 
 @keyframes logo-wobble {

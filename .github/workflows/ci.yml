@@ -31,6 +31,9 @@ jobs:
       - name: Lint (max. 5 Warnings, Standing Audit)
         run: npm run lint -- --max-warnings 5
 
+      - name: Kontrast der Textfarben (Audit A5)
+        run: npm run check:contrast
+
       - name: Unit-Tests mit Coverage
         run: npm run test:coverage
 
@@ -47,6 +50,26 @@ jobs:
           total=$(find dist/assets -name '*.js' -exec cat {} + | gzip -c | wc -c)
           printf '%-48s %6s KB\n' "GESAMT JS" "$(awk -v b="$total" 'BEGIN{printf "%.1f", b/1024}')" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bundle-Budget durchsetzen (Audit A5)
+        run: |
+          # Summe der einzeln gzippten Dateien — so kommen sie auch beim Geraet an.
+          total=0
+          for file in dist/assets/*.js dist/*.js; do
+            [ -f "$file" ] || continue
+            total=$((total + $(gzip -c "$file" | wc -c)))
+          done
+          limit=$((450 * 1024))
+          echo "JS gzip: $((total / 1024)) KB (Grenze $((limit / 1024)) KB)"
+          if [ "$total" -gt "$limit" ]; then
+            echo "::error::JS-Bundle ueberschreitet das A5-Budget."
+            exit 1
+          fi
+          # Der Arena-Chunk muss nachgeladen werden, nicht in index.html stehen.
+          if grep -q 'ArenaScreen' dist/index.html; then
+            echo "::error::Arena-Chunk wird beim Start geladen statt lazy (ADR-36)."
+            exit 1
+          fi
 
       - name: Coverage-Report hochladen
         if: always()

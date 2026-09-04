@@ -11,6 +11,7 @@ import { buildShowScript } from '@/core/choreographer';
 import { createSeededRng } from '@/core/rng';
 import { t } from '@/core/i18n';
 import type { PlayerId } from '@/core/lottery';
+import type { DeathId } from '@/core/session';
 import * as audio from '@/audio/AudioManager';
 import { showToast } from '@/ui/components/toast';
 import { vibrate } from '@/ui/haptics';
@@ -232,9 +233,19 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
      * gewürfelt — so bleibt die Sequenz im Pool, statt sich bei 40 % der Opfer selbst
      * auszuschliessen (ADR-34).
      */
-    if (round && deathMeta(round.deathId).requiresHat) {
-      const victim = shotlings.get(round.victimId);
-      if (victim && victim.getHat() === 'none') victim.setHat(rng.pick(HATS_WITH_BRIM));
+    if (round) {
+      // Jede Sequenz mit Hut-Bedarf bekommt einen — auch die des zweiten Double-Tap-Opfers.
+      const needsHat: [PlayerId, DeathId][] = [
+        [round.victimId, round.deathId],
+        ...round.extraVictimIds.map(
+          (id, index): [PlayerId, DeathId] => [id, round.extraDeaths[index]?.deathId ?? round.deathId]
+        ),
+      ];
+      for (const [playerId, deathId] of needsHat) {
+        if (!deathMeta(deathId).requiresHat) continue;
+        const target = shotlings.get(playerId);
+        if (target && target.getHat() === 'none') target.setHat(rng.pick(HATS_WITH_BRIM));
+      }
     }
 
     /* --- Scope und Kamera --- */
@@ -264,16 +275,6 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       for (let i = 0; i < brains.length; i++) brains[i]!.update(dt, brains);
       resolveOverlaps(brains);
 
-    /*
-     * Braucht die gewürfelte Sequenz einen Hut (`head_hat_launch` schiesst ihn weg), setzt
-     * die Arena dem Opfer einen auf. Hüte sind reine Zierde und werden pro Runde neu
-     * gewürfelt — so bleibt die Sequenz im Pool, statt sich bei 40 % der Opfer selbst
-     * auszuschliessen (ADR-34).
-     */
-    if (round && deathMeta(round.deathId).requiresHat) {
-      const victim = shotlings.get(round.victimId);
-      if (victim && victim.getHat() === 'none') victim.setHat(rng.pick(HATS_WITH_BRIM));
-    }
       for (const shotling of shotlings.values()) shotling.update(dt);
       particles?.update(dt);
       scope?.update(ticker.deltaMS);
@@ -302,6 +303,10 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       seed: round.seed,
       durationPreset: round.durationPreset,
       deathId: round.deathId,
+      extraVictims: round.extraVictimIds.map((victimId, index) => ({
+        victimId,
+        deathId: round.extraDeaths[index]?.deathId ?? round.deathId,
+      })),
     });
 
     director = new ShowDirector({

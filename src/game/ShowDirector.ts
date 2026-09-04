@@ -216,13 +216,15 @@ export class ShowDirector {
 
         case 'death': {
           const deathId = beat.deathId;
+          const deathVictimId = beat.victim;
           timeline.call(
             () => {
-              const victim = this.shotlingOf(victimId);
+              const victim = this.shotlingOf(deathVictimId);
               const sequence = getDeath(deathId);
               if (!victim || !sequence) return;
 
-              const others = [...shotlings.values()].filter((s) => s !== victim);
+              // Wer schon liegt, schaut nicht mehr zu (Double Tap: das erste Opfer).
+              const others = [...shotlings.values()].filter((s) => s !== victim && !s.isDead);
               const sub = sequence.build({
                 victim,
                 others,

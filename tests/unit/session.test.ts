@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MAX_PLAYERS, MAX_ROUND_HISTORY, STORAGE_KEY } from '@/config/rules';
 import type { Bet } from '@/core/lottery';
+import type { DeathId } from '@/core/session';
 import {
   activePlayers,
   createEmptySession,
@@ -34,6 +35,7 @@ function setup(overrides: Partial<RoundSetup> = {}): RoundSetup {
     victimId: 'p3',
     extraVictimIds: [],
     deathId: 'basic_fall',
+    extraDeaths: [],
     zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
@@ -371,5 +373,30 @@ describe('SessionStore', () => {
     const player = store.addPlayer(nameFor)!;
     expect(store.playerById(player.id)?.id).toBe(player.id);
     expect(store.playerById('gibt-es-nicht')).toBeUndefined();
+  });
+});
+
+describe('createRoundSetup — Double Tap zieht eine Sequenz je Opfer', () => {
+  it('legt fuer jedes Extra-Opfer genau eine Sequenz an', () => {
+    let calls = 0;
+    const round = createRoundSetup(BETS, 'doubleTap', 'normal', () => {
+      calls += 1;
+      return { deathId: `death_${calls}` as DeathId, zone: 'body' };
+    });
+
+    expect(round.extraVictimIds).toHaveLength(1);
+    expect(round.extraDeaths).toHaveLength(1);
+    expect(calls).toBe(2);
+    // Nacheinander aus demselben PRNG gezogen — nicht zweimal dieselbe Ziehung.
+    expect(round.extraDeaths[0]!.deathId).not.toBe(round.deathId);
+  });
+
+  it('bleibt in den anderen Modi bei einer Sequenz', () => {
+    const round = createRoundSetup(BETS, 'classic', 'normal', () => ({
+      deathId: 'basic_fall',
+      zone: 'body',
+    }));
+    expect(round.extraVictimIds).toHaveLength(0);
+    expect(round.extraDeaths).toHaveLength(0);
   });
 });

@@ -138,6 +138,11 @@ export class Shotling {
   private blinkIn: number;
   private blinkRemaining = 0;
   private state: ShotlingState = 'walk';
+
+  /** Liegt das Männchen schon? Double Tap fragt das, bevor es Zuschauer aufstellt. */
+  get isDead(): boolean {
+    return this.state === 'dead';
+  }
   private lowEffects: boolean;
 
   constructor(options: ShotlingOptions) {

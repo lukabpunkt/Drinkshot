@@ -81,6 +81,17 @@ export const CHOREO = {
   afterShockZoom: 1.08,
   afterShockMs: 600,
 
+  /**
+   * Double Tap: der Nachschlag auf das zweite Opfer (GDD §4.2).
+   *
+   * Kein zweiter Scan und keine zweite Panik — die Spannung ist mit dem ersten Schuss
+   * verbraucht, ein zweiter Aufbau wuerde sie nicht wiederholen, sondern langweilen. Statt
+   * dessen: kurzer Ruck aufs naechste Ziel, Klammern zu, Schuss. Ueberraschung statt
+   * Aufbau.
+   */
+  doubleTapSwingMs: 500,
+  doubleTapLockMs: 900,
+
   /** Iris-Wipe beim Oeffnen des Scopes. */
   introIrisMs: 900,
   /** Reveal: Vignette faehrt weg, Result faehrt rein. */

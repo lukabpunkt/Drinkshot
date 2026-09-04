@@ -49,6 +49,8 @@ export interface RoundSetup {
   extraVictimIds: PlayerId[];
   deathId: DeathId;
   zone: DeathZone;
+  /** Double Tap: die Sequenzen der weiteren Opfer, gleiche Reihenfolge wie `extraVictimIds`. */
+  extraDeaths: { deathId: DeathId; zone: DeathZone }[];
   mode: GameMode;
   durationPreset: DurationPreset;
 }
@@ -110,10 +112,17 @@ export function createRoundSetup(
 ): RoundSetup {
   const victims = pickVictims(bets, MODE_SPECS[mode].victims);
   const seed = createSeed();
-  const death = chooseDeath?.(createSeededRng(seed)) ?? {
-    deathId: PLACEHOLDER_DEATH_ID,
-    zone: PLACEHOLDER_DEATH_ZONE,
-  };
+
+  /*
+   * Ein PRNG für alle Ziehungen der Runde, nacheinander abgerufen — jedes Opfer bekommt
+   * seine eigene Sequenz, und der Seed reicht weiterhin, um die ganze Show identisch zu
+   * wiederholen.
+   */
+  const rng = createSeededRng(seed);
+  const draw = (): { deathId: DeathId; zone: DeathZone } =>
+    chooseDeath?.(rng) ?? { deathId: PLACEHOLDER_DEATH_ID, zone: PLACEHOLDER_DEATH_ZONE };
+
+  const death = draw();
 
   return {
     seed,
@@ -122,6 +131,7 @@ export function createRoundSetup(
     extraVictimIds: victims.slice(1),
     deathId: death.deathId,
     zone: death.zone,
+    extraDeaths: victims.slice(1).map(() => draw()),
     mode,
     durationPreset,
   };

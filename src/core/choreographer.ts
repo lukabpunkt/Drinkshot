@@ -24,7 +24,7 @@ export type Beat =
   | { t: number; type: 'fakeLock'; target: PlayerId; holdMs: number }
   | { t: number; type: 'lock'; target: PlayerId; holdMs: number }
   | { t: number; type: 'shot' }
-  | { t: number; type: 'death'; deathId: DeathId }
+  | { t: number; type: 'death'; deathId: DeathId; victim: PlayerId }
   | { t: number; type: 'outro' };
 
 /** Beats, die das Reticle auf ein Ziel legen. */
@@ -41,6 +41,11 @@ export interface ChoreographyInput {
   seed: number;
   durationPreset: DurationPreset;
   deathId: DeathId;
+  /**
+   * Double Tap: weitere Opfer nach dem ersten, in der Reihenfolge des Nachschlags.
+   * Jedes bekommt Ruck, Lock, Schuss und eigene Sequenz — aber keinen neuen Aufbau.
+   */
+  extraVictims?: readonly { victimId: PlayerId; deathId: DeathId }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -172,10 +177,16 @@ function balanceHolds(
 
 export function buildShowScript(input: ChoreographyInput): ShowScript {
   const { players, victimId, seed, durationPreset, deathId } = input;
+  const extraVictims = input.extraVictims ?? [];
 
   if (players.length === 0) throw new RangeError('buildShowScript: keine Spieler.');
   if (!players.includes(victimId)) {
     throw new RangeError(`buildShowScript: Opfer ${victimId} ist nicht in der Spielerliste.`);
+  }
+  for (const extra of extraVictims) {
+    if (!players.includes(extra.victimId)) {
+      throw new RangeError(`buildShowScript: Opfer ${extra.victimId} ist nicht in der Spielerliste.`);
+    }
   }
 
   const rng = createSeededRng(seed);
@@ -361,14 +372,16 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
 
   /* --- Schuss und Tod --- */
   beats.push({ t, type: 'shot' });
-  beats.push({ t, type: 'death', deathId });
+  beats.push({ t, type: 'death', deathId, victim: victimId });
   t += phases.death;
-
-  beats.push({ t, type: 'outro' });
 
   /*
    * Rundungsfehler der Phasen-Verteilung auf die Soll-Dauer ziehen: Audit A3 verlangt
    * 10/15/22 s ± 1 s, und das soll nicht vom Zufall abhängen.
+   *
+   * Der Nachschlag von Double Tap zählt hier **nicht** mit: Das Preset beschreibt den
+   * Aufbau bis zum Schuss, und der ist bei zwei Opfern derselbe. Die Runde dauert dann
+   * eben länger — das ist der Modus.
    */
   const target = DURATION_MS[durationPreset];
   const drift = target - t;
@@ -382,6 +395,27 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
     }
     t = target;
   }
+
+  /* --- Double Tap: Nachschlag ohne neuen Aufbau (GDD §4.2) --- */
+  for (const extra of extraVictims) {
+    beats.push({
+      t,
+      type: 'aim',
+      target: extra.victimId,
+      holdMs: CHOREO.doubleTapSwingMs,
+      style: 'snap',
+    });
+    t += CHOREO.doubleTapSwingMs;
+
+    beats.push({ t, type: 'lock', target: extra.victimId, holdMs: CHOREO.doubleTapLockMs });
+    t += CHOREO.doubleTapLockMs;
+
+    beats.push({ t, type: 'shot' });
+    beats.push({ t, type: 'death', deathId: extra.deathId, victim: extra.victimId });
+    t += phases.death;
+  }
+
+  beats.push({ t, type: 'outro' });
 
   return { totalMs: t, beats };
 }

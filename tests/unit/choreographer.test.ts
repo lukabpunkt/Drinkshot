@@ -356,3 +356,81 @@ describe('Choreographer — Determinismus', () => {
     }
   });
 });
+
+describe('Choreographer — Double Tap', () => {
+  const players = ['p1', 'p2', 'p3', 'p4'];
+
+  const script = buildShowScript({
+    players,
+    victimId: 'p2',
+    seed: 4711,
+    durationPreset: 'normal',
+    deathId: 'body_dramatic',
+    extraVictims: [{ victimId: 'p4', deathId: 'leg_hop' }],
+  });
+
+  it('erschiesst beide Opfer, jedes mit eigener Sequenz', () => {
+    const deaths = script.beats.filter((beat) => beat.type === 'death');
+    expect(deaths).toHaveLength(2);
+    expect(deaths.map((beat) => (beat.type === 'death' ? beat.victim : ''))).toEqual(['p2', 'p4']);
+    expect(deaths.map((beat) => (beat.type === 'death' ? beat.deathId : ''))).toEqual([
+      'body_dramatic',
+      'leg_hop',
+    ]);
+  });
+
+  it('gibt dem Nachschlag Lock und Schuss, aber keinen neuen Aufbau', () => {
+    const shots = script.beats.filter((beat) => beat.type === 'shot');
+    const locks = script.beats.filter((beat) => beat.type === 'lock');
+    expect(shots).toHaveLength(2);
+    expect(locks).toHaveLength(2);
+    // Genau ein Intro — die Show beginnt nicht von vorne.
+    expect(script.beats.filter((beat) => beat.type === 'intro')).toHaveLength(1);
+    expect(script.beats.filter((beat) => beat.type === 'outro')).toHaveLength(1);
+  });
+
+  it('das Outro steht am Ende, nach dem letzten Tod', () => {
+    const last = script.beats[script.beats.length - 1]!;
+    expect(last.type).toBe('outro');
+    expect(last.t).toBeLessThanOrEqual(script.totalMs);
+  });
+
+  it('der Nachschlag verlaengert die Runde, ohne das Preset zu verschieben', () => {
+    const single = buildShowScript({
+      players,
+      victimId: 'p2',
+      seed: 4711,
+      durationPreset: 'normal',
+      deathId: 'body_dramatic',
+    });
+
+    // Der Aufbau bis zum ersten Schuss ist identisch — das Preset beschreibt nur ihn.
+    const firstShot = (s: typeof script) => s.beats.find((beat) => beat.type === 'shot')!.t;
+    expect(firstShot(script)).toBe(firstShot(single));
+    expect(script.totalMs).toBeGreaterThan(single.totalMs);
+  });
+
+  it('die Fairness-Bilanz vor dem Lock bleibt unberuehrt', () => {
+    const single = buildShowScript({
+      players,
+      victimId: 'p2',
+      seed: 4711,
+      durationPreset: 'normal',
+      deathId: 'body_dramatic',
+    });
+    expect(dwellBeforeLock(script)).toEqual(dwellBeforeLock(single));
+  });
+
+  it('weist ein Opfer ausserhalb der Spielerliste zurueck', () => {
+    expect(() =>
+      buildShowScript({
+        players,
+        victimId: 'p2',
+        seed: 1,
+        durationPreset: 'normal',
+        deathId: 'basic_fall',
+        extraVictims: [{ victimId: 'fremd', deathId: 'basic_fall' }],
+      })
+    ).toThrow(RangeError);
+  });
+});

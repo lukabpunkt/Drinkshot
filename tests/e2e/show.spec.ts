@@ -243,3 +243,56 @@ test('erzwungene Sequenz landet mit der richtigen Zone im Result', async ({ page
   // Zonen-Text aus der Registry, nicht aus einem Platzhalter.
   await expect(page.locator('.result__zone')).toContainText('Ins Bein');
 });
+
+test('Double Tap: zwei Opfer, zwei Schüsse, beide trinken (Audit A5)', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
+    window.localStorage.setItem(
+      'drinkshot.session.v1',
+      JSON.stringify({ players: [], rounds: [], settings: { sound: false, mode: 'doubleTap' } })
+    );
+  });
+  // Kurzes Preset: Der Nachschlag hängt hinten dran, die Runde wird ohnehin länger.
+  await page.goto('./?dev=1');
+
+  await page.getByRole('button', { name: 'Spielen' }).click();
+  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
+  while ((await page.locator('.lobby__row').count()) < PLAYERS) await add.click();
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  for (let i = 0; i < PLAYERS; i++) {
+    await tapPass(page);
+    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+    if (await page.locator('.screen--arena').count()) break;
+  }
+  await page.locator('.screen--arena').waitFor({ timeout: 20_000 });
+
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 120_000 });
+
+  /*
+   * Der Beleg steht im Result: Kopfzeile nennt das erste Opfer, die Unterzeile das
+   * zweite — zwei verschiedene Namen, beide trinken (GDD §4.2).
+   */
+  const headline = (await page.locator('.result__headline').textContent()) ?? '';
+  const sub = (await page.locator('.result__sub').textContent()) ?? '';
+  expect(headline).toMatch(/trinkt/);
+  expect(sub).toMatch(/trinkt/);
+
+  const nameIn = (text: string) => text.match(/^(Spieler \d)/)?.[1];
+  expect(nameIn(headline)).toBeTruthy();
+  expect(nameIn(sub)).toBeTruthy();
+  expect(nameIn(sub)).not.toBe(nameIn(headline));
+
+  const rounds = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          drinkshot: { session: { state: { rounds: { drinkers: unknown[] }[] } } };
+        }
+      ).drinkshot.session.state.rounds
+  );
+  expect(rounds[rounds.length - 1]?.drinkers).toHaveLength(2);
+});

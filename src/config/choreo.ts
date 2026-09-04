@@ -134,6 +134,24 @@ export const INTRO = {
   /** Wie lange die Maennchen nach dem Warnschuss sprinten. */
   scatterMs: 700,
 
+  /**
+   * Karenzzeit, bevor ein Tipp den Auftakt ueberspringt.
+   *
+   * Der Skip-Handler liegt auf dem ganzen Bildschirm und war ~200 ms nach "Los!" scharf —
+   * noch waehrend des Wipes. Wer das Handy wie aufgefordert hinlegt, streifte den Schirm
+   * und loeschte den Auftakt. PASS sperrt 800 ms, READY 400 ms; hier liegt die Mitte.
+   */
+  armMs: 700,
+  /**
+   * Reine Haenger-Sicherung fuer den Ausstieg in der Arena.
+   *
+   * Regulaer erscheint er, sobald die Show startet — dieser Timer greift nur, wenn der
+   * Auftakt nie fertig wird. Deshalb grosszuegig: Der volle Auftakt braucht 5,0 s, und auf
+   * einem kalten Start kommen Atlas und Arena-Chunk davor. Ein knapper Wert liesse das ✕
+   * mitten im Schuetzen aufblitzen.
+   */
+  exitAfterMs: 10_000,
+
   /** Abstand zweier Maennchen in der Reihe, als Anteil ihrer Hoehe. */
   rowSpacingFactor: 0.55,
   /**

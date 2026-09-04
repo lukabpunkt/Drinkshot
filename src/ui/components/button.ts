@@ -84,3 +84,31 @@ export function createChip(options: ChipOptions): HTMLButtonElement {
   if (options.onClick) chip.addEventListener('click', options.onClick);
   return chip;
 }
+
+/**
+ * Ikonen-Knopf am Bildschirmrand — Heimweg und Rundenabbruch (ADR-55).
+ *
+ * Bewusst kein Sticker-Button: Er soll erreichbar sein, aber nicht mit dem CTA um
+ * Aufmerksamkeit ringen. Volle 44-px-Trefferflaeche, Glyphe deutlich kleiner.
+ */
+export function createIconButton(options: {
+  icon: string;
+  ariaLabel: string;
+  className?: string;
+  onClick: () => void;
+}): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'icon-btn';
+  if (options.className) button.classList.add(...options.className.split(' '));
+  button.setAttribute('aria-label', options.ariaLabel);
+  button.innerHTML = options.icon;
+  button.addEventListener('click', options.onClick);
+  return button;
+}
+
+export const ICON_HOME =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11.5 12 4l8 7.5M6.5 10v9h11v-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
+export const ICON_CLOSE =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6 18 18M18 6 6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>';

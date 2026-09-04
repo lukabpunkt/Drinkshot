@@ -18,6 +18,7 @@ import type { PlayerId } from '@/core/lottery';
 import type { DeathId } from '@/core/session';
 import * as audio from '@/audio/AudioManager';
 import { prefersReducedMotion } from '@/ui/animate';
+import { createIconButton, ICON_CLOSE } from '@/ui/components/button';
 import { showToast } from '@/ui/components/toast';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
@@ -146,13 +147,30 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   skip.textContent = t('arena.skip');
   skip.hidden = true;
 
-  el.append(stage, hud, lockLabel, skip);
+  /*
+   * Der einzige Ausstieg aus der Arena.
+   *
+   * In der installierten PWA (`display: standalone`) gibt es keinen Browser-Zurueck-Knopf.
+   * Ohne dieses ✕ waere die Arena dort unverlassbar, sobald etwas haengt (ADR-55). Es
+   * erscheint erst nach dem Auftakt, damit es waehrend des Schuetzen nicht ablenkt.
+   */
+  const exit = createIconButton({
+    icon: ICON_CLOSE,
+    ariaLabel: t('nav.abortAria'),
+    className: 'screen__exit',
+    onClick: ctx.abortRound,
+  });
+  exit.hidden = true;
+
+  el.append(stage, hud, lockLabel, skip, exit);
 
   /* ------------------------------------------------------------------ */
 
   let disposed = false;
   /** Notausgang ins Result, wenn die Arena nicht aufgebaut werden konnte. */
   let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Notfall-Einblendung des Ausstiegs, falls der Auftakt nie fertig wird. */
+  let exitTimer: ReturnType<typeof setTimeout> | undefined;
   /** Herzschlag-Puls der Haptik während des Locks. */
   let lockPulseTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -321,6 +339,18 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
         if (!disposed) failGracefully('error.generic', error, false);
       }
     );
+  }
+
+  /**
+   * Blendet den Ausstieg ein — nach dem Auftakt, spaetestens aber nach `ARENA_EXIT_MS`.
+   * Der Timer ist kein Luxus: Haengt die Inszenierung, ist er der einzige Weg heraus.
+   */
+  function revealExit(): void {
+    if (exitTimer !== undefined) {
+      globalThis.clearTimeout(exitTimer);
+      exitTimer = undefined;
+    }
+    if (!disposed) exit.hidden = false;
   }
 
   async function build(): Promise<void> {
@@ -651,6 +681,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       disarmIntroSkip();
       intro?.destroy();
       intro = undefined;
+      revealExit();
       show.play();
     };
 
@@ -693,6 +724,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     activate() {
       releaseWakeLock = requestWakeLock();
       if (!areArenaAssetsReady()) el.classList.add('is-loading');
+      exitTimer = globalThis.setTimeout(revealExit, INTRO.exitAfterMs);
       runBuild();
     },
     destroy() {
@@ -702,6 +734,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       intro?.destroy();
       intro = undefined;
       if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
+      if (exitTimer !== undefined) globalThis.clearTimeout(exitTimer);
       document.removeEventListener('visibilitychange', onVisibility);
       releaseWakeLock?.();
       offLayout?.();

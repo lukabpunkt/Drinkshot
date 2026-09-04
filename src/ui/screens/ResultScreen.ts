@@ -202,7 +202,14 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
     onClick: () => openModeSheet(ctx),
   });
 
-  actions.append(next, changePlayers, changeMode);
+  const home = createButton({
+    label: t('nav.home'),
+    variant: 'ghost',
+    className: 'btn--block',
+    onClick: () => ctx.fsm.send({ type: 'quit' }),
+  });
+
+  actions.append(next, changePlayers, changeMode, home);
 
   if (!canContinue) {
     const note = document.createElement('p');

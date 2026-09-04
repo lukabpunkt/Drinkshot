@@ -1,5 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/*
+ * Der Port ist ueberschreibbar, weil 4173 der Vite-Standard ist: Laeuft daneben die
+ * Vorschau eines anderen Projekts, uebernahm `reuseExistingServer` bisher stillschweigend
+ * deren Server — und der Lauf brach mit einem Timeout ab, ohne den Grund zu nennen.
+ */
+const PORT = process.env.PREVIEW_PORT ?? '4173';
+const BASE_URL = `http://localhost:${PORT}/Drinkshot/`;
+
 /**
  * Mobile-Emulation ist Pflicht (CLAUDE.md "Mobile First").
  * Ab M1 laeuft `flow.spec.ts`, ab M3 `perf.spec.ts` (Architektur §12).
@@ -31,7 +39,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://localhost:4173/Drinkshot/',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -52,8 +60,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run build && npm run preview',
-    url: 'http://localhost:4173/Drinkshot/',
+    command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

@@ -10,7 +10,7 @@ import { COACHMARK_MS, DEFAULT_BET } from '@/config/rules';
 import { colorById, hex, MOTION } from '@/config/theme';
 import { t } from '@/core/i18n';
 import { safeAnimate } from '@/ui/animate';
-import { createButton } from '@/ui/components/button';
+import { createButton, createIconButton, ICON_CLOSE } from '@/ui/components/button';
 import { createCoachmark } from '@/ui/components/coachmark';
 import { createBetStepper } from '@/ui/components/stepper';
 import { vibrate } from '@/ui/haptics';
@@ -46,7 +46,14 @@ export function createBetScreen(ctx: ScreenContext): ScreenInstance {
     className: 'btn--block bet__confirm',
   });
 
-  el.append(who, headline, stepper.el, hint, confirm);
+  const exit = createIconButton({
+    icon: ICON_CLOSE,
+    ariaLabel: t('nav.abortAria'),
+    className: 'screen__exit',
+    onClick: ctx.abortRound,
+  });
+
+  el.append(exit, who, headline, stepper.el, hint, confirm);
 
   // Einmaliger Hinweis in der ersten Runde: was der Einsatz eigentlich bedeutet.
   const coach = createCoachmark('bet', { autoDismissMs: COACHMARK_MS });

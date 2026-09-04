@@ -745,9 +745,12 @@
 
 .pass__inner {
   position: relative;
+  /* Ueber der Tap-Flaeche, aber durchlaessig — der Button darunter faengt den Tap. */
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  pointer-events: none;
 }
 
 .pass__position {
@@ -1803,4 +1806,78 @@
 .result__crown {
   background: var(--c-accent);
   color: var(--c-ink);
+}
+
+/* ------------------------------------------------------------------ */
+/* Heimweg & Rundenabbruch (ADR-55)                                    */
+/* ------------------------------------------------------------------ */
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: currentcolor;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  opacity: 1;
+}
+
+/* In der Runde: oben links, ausserhalb des Blickzentrums. */
+.screen__exit {
+  position: absolute;
+  top: calc(var(--space-4) + var(--safe-top));
+  left: calc(var(--space-3) + var(--safe-left, 0px));
+  z-index: 2;
+  color: var(--c-paper);
+}
+
+.screen--pass .screen__exit {
+  color: var(--pass-ink);
+}
+
+/*
+ * In der Arena erscheint der Ausstieg erst nach dem Auftakt — vorher wuerde er vom
+ * Schuetzen ablenken. Ohne ihn gaebe es in der installierten PWA gar keinen Weg heraus.
+ */
+.screen--arena .screen__exit {
+  transition: opacity var(--dur-2) ease;
+}
+
+.screen--arena .screen__exit[hidden] {
+  display: none;
+}
+
+.screen--bet,
+.screen--ready,
+.screen--arena {
+  position: relative;
+}
+
+.lobby__home {
+  margin-left: calc(var(--space-3) * -1);
+  color: var(--c-paper);
+}
+
+/* Die Tap-Flaeche des Privacy-Screens — unsichtbar, aber ein echter Button. */
+.pass__surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }

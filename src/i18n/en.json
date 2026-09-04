@@ -177,5 +177,10 @@
   "onboarding": {
     "bet": "The higher your bet, the more you drink — and the likelier you get hit.",
     "pass": "Pass the phone on. Nobody gets to see anyone else's bet."
+  },
+  "nav": {
+    "home": "Main menu",
+    "homeAria": "Back to the main menu",
+    "abortAria": "Abort round"
   }
 }

@@ -13,7 +13,7 @@
 import { hex, UI_COLORS } from '@/config/theme';
 import { READY_ARM_MS } from '@/config/rules';
 import { t } from '@/core/i18n';
-import { createButton, createChip } from '@/ui/components/button';
+import { createButton, createChip, createIconButton, ICON_CLOSE } from '@/ui/components/button';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
@@ -82,7 +82,14 @@ export function createReadyScreen(ctx: ScreenContext): ScreenInstance {
     },
   });
 
-  el.append(headline, roster, putDown, chips, modeHint, start);
+  const exit = createIconButton({
+    icon: ICON_CLOSE,
+    ariaLabel: t('nav.abortAria'),
+    className: 'screen__exit',
+    onClick: ctx.abortRound,
+  });
+
+  el.append(exit, headline, roster, putDown, chips, modeHint, start);
 
   let armTimer: ReturnType<typeof setTimeout> | undefined;
 

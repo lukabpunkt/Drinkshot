@@ -9,6 +9,7 @@
 import { COACHMARK_MS, PASS_TAP_LOCK_MS } from '@/config/rules';
 import { colorById, hex, textColorOn } from '@/config/theme';
 import { t } from '@/core/i18n';
+import { createIconButton, ICON_CLOSE } from '@/ui/components/button';
 import { createCoachmark } from '@/ui/components/coachmark';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
@@ -52,7 +53,30 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   instruction.textContent = t('pass.tapWhenReady');
 
   inner.append(position, lead, name, instruction);
-  el.append(stripes, inner);
+
+  /*
+   * Die Tap-Flaeche ist ein echter Button, nicht der Screen selbst.
+   *
+   * Frueher trug `el` `role="button"`. Seit hier ein Abbruch-✕ sitzt (ADR-55), waere das
+   * ein verschachteltes Bedienelement — axe meldet `nested-interactive`. Der Button liegt
+   * flaechendeckend darunter, das ✕ darueber.
+   */
+  const surface = document.createElement('button');
+  surface.type = 'button';
+  surface.className = 'pass__surface';
+  surface.setAttribute(
+    'aria-label',
+    `${t('pass.handOver')} ${player?.name ?? ''}. ${t('pass.tapWhenReady')}`
+  );
+
+  const exit = createIconButton({
+    icon: ICON_CLOSE,
+    ariaLabel: t('nav.abortAria'),
+    className: 'screen__exit',
+    onClick: ctx.abortRound,
+  });
+
+  el.append(stripes, surface, inner, exit);
 
   // Einmaliger Hinweis in der ersten Runde: warum das Handy überhaupt wandert.
   const coach = createCoachmark('pass', { autoDismissMs: COACHMARK_MS });
@@ -62,8 +86,10 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   let armed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const onTap = (): void => {
+  const onTap = (event: Event): void => {
     if (!armed) return;
+    // Das ✕ gehoert dem Abbruch, nicht der Weitergabe.
+    if ((event.target as HTMLElement | null)?.closest('.screen__exit')) return;
     armed = false;
     coach.dismiss();
     vibrate('tap');
@@ -71,17 +97,6 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   };
 
   el.addEventListener('click', onTap);
-  el.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onTap();
-    }
-  });
-
-  // Der Screen ist selbst der Button — deshalb fokussierbar und beschriftet.
-  el.tabIndex = 0;
-  el.setAttribute('role', 'button');
-  el.setAttribute('aria-label', `${t('pass.handOver')} ${player?.name ?? ''}. ${t('pass.tapWhenReady')}`);
 
   return {
     el,
@@ -90,7 +105,7 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
         armed = true;
         el.classList.remove('is-locked');
       }, PASS_TAP_LOCK_MS);
-      el.focus({ preventScroll: true });
+      surface.focus({ preventScroll: true });
     },
     destroy() {
       coach.dismiss();

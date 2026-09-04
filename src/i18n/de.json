@@ -177,5 +177,10 @@
   "onboarding": {
     "bet": "Je höher dein Einsatz, desto mehr trinkst du — aber desto wahrscheinlicher trifft es dich auch.",
     "pass": "Reich das Handy weiter. Niemand darf den Einsatz der anderen sehen."
+  },
+  "nav": {
+    "home": "Hauptmenü",
+    "homeAria": "Zurück zum Hauptmenü",
+    "abortAria": "Runde abbrechen"
   }
 }

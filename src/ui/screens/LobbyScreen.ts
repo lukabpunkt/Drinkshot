@@ -9,7 +9,7 @@
 import { MAX_NAME_LENGTH, MAX_PLAYERS, MIN_PLAYERS } from '@/config/rules';
 import { t } from '@/core/i18n';
 import { eliminatedPlayerIds, type Player } from '@/core/session';
-import { createButton, createChip } from '@/ui/components/button';
+import { createButton, createChip, createIconButton, ICON_HOME } from '@/ui/components/button';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { showToast } from '@/ui/components/toast';
 import { vibrate } from '@/ui/haptics';
@@ -33,7 +33,14 @@ export function createLobbyScreen(ctx: ScreenContext): ScreenInstance {
   const count = document.createElement('p');
   count.className = 'lobby__count';
 
-  header.append(headline, count);
+  const home = createIconButton({
+    icon: ICON_HOME,
+    ariaLabel: t('nav.homeAria'),
+    className: 'lobby__home',
+    onClick: () => ctx.fsm.send({ type: 'quit' }),
+  });
+
+  header.append(home, headline, count);
 
   const list = document.createElement('ul');
   list.className = 'lobby__list';

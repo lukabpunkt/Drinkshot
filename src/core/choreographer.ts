@@ -12,7 +12,7 @@
  * - Bei zwei Spielern gibt es mindestens vier Wechsel in der Panik-Phase.
  */
 
-import { CHOREO, CHOREO_FAIRNESS, phaseDurations } from '@/config/choreo';
+import { CHOREO, CHOREO_FAIRNESS, phaseDurations, type PhaseId } from '@/config/choreo';
 import { DURATION_MS, type DurationPreset } from '@/config/rules';
 import { createSeededRng, type SeededRng } from './rng';
 import type { PlayerId } from './lottery';
@@ -175,32 +175,76 @@ function balanceHolds(
 /* Hauptfunktion                                                       */
 /* ------------------------------------------------------------------ */
 
-export function buildShowScript(input: ChoreographyInput): ShowScript {
-  const { players, victimId, seed, durationPreset, deathId } = input;
-  const extraVictims = input.extraVictims ?? [];
+/* ------------------------------------------------------------------ */
+/* Segmente                                                            */
+/* ------------------------------------------------------------------ */
 
-  if (players.length === 0) throw new RangeError('buildShowScript: keine Spieler.');
-  if (!players.includes(victimId)) {
-    throw new RangeError(`buildShowScript: Opfer ${victimId} ist nicht in der Spielerliste.`);
-  }
-  for (const extra of extraVictims) {
-    if (!players.includes(extra.victimId)) {
-      throw new RangeError(`buildShowScript: Opfer ${extra.victimId} ist nicht in der Spielerliste.`);
-    }
-  }
+/**
+ * Ein Segment ist ein vollständiger Bogen: anvisieren, locken, schiessen, sterben.
+ *
+ * Die klassische Runde besteht aus **einem** Segment. Der Showdown reiht mehrere
+ * aneinander, jedes über die zu dem Zeitpunkt noch lebenden Spieler — und genau deshalb
+ * werden Opfer, Nicht-Opfer und Verweilzeit-Bilanz **pro Segment** gerechnet. Global
+ * gerechnet wäre bei n−1 Opfern nur ein einziger Nicht-Opfer übrig, und die Regel „der
+ * letzte Fake ist nie das Opfer" würde in jedem Segment den Gewinner verraten.
+ */
+interface SegmentPlan {
+  /** Wer in diesem Segment noch lebt und angevisiert werden darf. */
+  players: readonly PlayerId[];
+  victimId: PlayerId;
+  deathId: DeathId;
+  /** Phasenbudget dieses Segments. `intro: 0` heisst: kein Intro-Beat. */
+  phases: Record<PhaseId, number>;
+  /** Soll-Länge. Die Rundungsdrift landet im Lock-Hold. */
+  budgetMs: number;
+  fakeCount: number;
+  /** `undefined` = alle scannen (Klassik). `0` = kein Scan (Montage-Segment). */
+  scanBeats: number | undefined;
+  panicHoldMs: readonly [number, number];
+  /** Untergrenze für die Anzahl Panik-Beats; 0 = keine. */
+  minPanicBeats: number;
+  /** Letztes Ziel des Vorgängersegments — kein Repeat über die Grenze hinweg. */
+  previousTarget: PlayerId | undefined;
+}
 
-  const rng = createSeededRng(seed);
-  const phases = phaseDurations(durationPreset);
+interface SegmentResult {
+  beats: Beat[];
+  /** Immer exakt `plan.budgetMs`. */
+  durationMs: number;
+  lastTarget: PlayerId;
+}
+
+/**
+ * Zieht ein Segment exakt auf sein Budget: Der Lock-Hold nimmt die Rundungsdrift auf.
+ *
+ * Angefasst wird nur der Lock **dieses** Segments. Alles davor bleibt liegen — die
+ * Fairness-Bilanz vor dem Lock darf sich nicht verschieben —, alles danach wandert mit.
+ */
+function applyDrift(beats: Beat[], drift: number): void {
+  if (drift === 0) return;
+  const lockBeat = beats.find((beat) => beat.type === 'lock');
+  if (!lockBeat || lockBeat.type !== 'lock') return;
+
+  lockBeat.holdMs = Math.max(1, lockBeat.holdMs + drift);
+  for (const beat of beats) {
+    if (beat.t > lockBeat.t) beat.t += drift;
+  }
+}
+
+function buildSegment(plan: SegmentPlan, rng: SeededRng, t0: number): SegmentResult {
+  const { players, victimId, phases } = plan;
   const beats: Beat[] = [];
-
-  let t = 0;
+  let t = t0;
 
   /* --- Intro: Iris-Wipe, alle laufen los --- */
-  beats.push({ t, type: 'intro' });
-  t += phases.intro;
+  if (phases.intro > 0) {
+    beats.push({ t, type: 'intro' });
+    t += phases.intro;
+  }
 
   /* --- Scan: jeder genau einmal, weich angefahren --- */
-  const scanOrder = shuffleWithoutRepeats(players, rng);
+  const shuffled = shuffleWithoutRepeats(players, rng, plan.previousTarget);
+  const scanOrder = plan.scanBeats === undefined ? shuffled : shuffled.slice(0, plan.scanBeats);
   const scanHolds = distribute(
     phases.scan,
     scanOrder.length,
@@ -215,22 +259,22 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
   });
 
   /* --- Panik: schnellere Wechsel, dazwischen die Fake-Locks --- */
-  const fakeCount = CHOREO.fakeLocksByPreset[durationPreset];
+  const fakeCount = plan.fakeCount;
   const fakeHold = Math.round((CHOREO.fakeLockHoldMs[0] + CHOREO.fakeLockHoldMs[1]) / 2);
   const panicBudget = Math.max(0, phases.panic - fakeCount * fakeHold);
 
-  const averagePanicHold = (CHOREO.panicHoldMs[0] + CHOREO.panicHoldMs[1]) / 2;
+  const averagePanicHold = (plan.panicHoldMs[0] + plan.panicHoldMs[1]) / 2;
   let aimCount = Math.max(1, Math.round(panicBudget / averagePanicHold));
-  if (players.length === 2) {
+  if (plan.minPanicBeats > 0) {
     // GDD §3.5: zu zweit darf es nicht in drei Sekunden vorbei sein.
-    aimCount = Math.max(aimCount, CHOREO_FAIRNESS.minPanicBeatsTwoPlayers);
+    aimCount = Math.max(aimCount, plan.minPanicBeats);
   }
 
   const panicHolds = distribute(
     panicBudget,
     aimCount,
-    CHOREO.panicHoldMs[0],
-    CHOREO.panicHoldMs[1],
+    plan.panicHoldMs[0],
+    plan.panicHoldMs[1],
     rng
   );
 
@@ -285,7 +329,9 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
    * Fake dazwischenrutscht. Deshalb bekommt jeder Beat das Ziel, das bisher am
    * **wenigsten** im Fadenkreuz hing.
    *
-   * Die Bilanz startet mit der Scan-Phase, damit die Panik deren Ungleichheit ausgleicht.
+   * Die Bilanz startet mit der Scan-Phase, damit die Panik deren Ungleichheit ausgleicht
+   * — und sie ist **segmentlokal**: Über Segmente hinweg getragen, rechnete `balanceHolds`
+   * die Zeit längst toter Spieler mit und die Normierung wäre schief.
    */
   const dwell = new Map<PlayerId, number>(players.map((player) => [player, 0]));
   scanOrder.forEach((target, index) => {
@@ -312,7 +358,7 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
     return chosen;
   };
 
-  let previousTarget = scanOrder[scanOrder.length - 1];
+  let previousTarget = scanOrder[scanOrder.length - 1] ?? plan.previousTarget;
 
   /** Erst die Ziele festlegen, dann die Haltezeiten ausbalancieren, dann emittieren. */
   interface PlannedBeat {
@@ -321,7 +367,7 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
     holdMs: number;
   }
 
-  const plan: PlannedBeat[] = [];
+  const plan_: PlannedBeat[] = [];
 
   for (const slot of slots) {
     if (slot.kind === 'fake') {
@@ -338,20 +384,20 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
       const candidates = eligible.filter((player) => player !== previousTarget);
       const allowed = candidates.length > 0 ? candidates : eligible;
       const target = allowed.length > 0 ? takeLeastSeen(allowed, slot.holdMs) : victimId;
-      plan.push({ kind: 'fake', target, holdMs: slot.holdMs });
+      plan_.push({ kind: 'fake', target, holdMs: slot.holdMs });
       previousTarget = target;
     } else {
       // Aim-Beats wiederholen nie das laufende Ziel — bei ≥ 2 Spielern immer möglich.
       const allowed = players.filter((player) => player !== previousTarget);
-      const target = takeLeastSeen(allowed, slot.holdMs);
-      plan.push({ kind: 'aim', target, holdMs: slot.holdMs });
+      const target = takeLeastSeen(allowed.length > 0 ? allowed : players, slot.holdMs);
+      plan_.push({ kind: 'aim', target, holdMs: slot.holdMs });
       previousTarget = target;
     }
   }
 
-  balanceHolds(plan, players, scanDwell, panicBudget);
+  balanceHolds(plan_, players, scanDwell, panicBudget);
 
-  for (const planned of plan) {
+  for (const planned of plan_) {
     if (planned.kind === 'fake') {
       beats.push({ t, type: 'fakeLock', target: planned.target, holdMs: planned.holdMs });
     } else {
@@ -372,31 +418,67 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
 
   /* --- Schuss und Tod --- */
   beats.push({ t, type: 'shot' });
-  beats.push({ t, type: 'death', deathId, victim: victimId });
+  beats.push({ t, type: 'death', deathId: plan.deathId, victim: victimId });
   t += phases.death;
 
   /*
    * Rundungsfehler der Phasen-Verteilung auf die Soll-Dauer ziehen: Audit A3 verlangt
    * 10/15/22 s ± 1 s, und das soll nicht vom Zufall abhängen.
-   *
-   * Der Nachschlag von Double Tap zählt hier **nicht** mit: Das Preset beschreibt den
-   * Aufbau bis zum Schuss, und der ist bei zwei Opfern derselbe. Die Runde dauert dann
-   * eben länger — das ist der Modus.
    */
-  const target = DURATION_MS[durationPreset];
-  const drift = target - t;
-  if (drift !== 0) {
-    const lockBeat = beats.find((beat) => beat.type === 'lock');
-    if (lockBeat && lockBeat.type === 'lock') {
-      lockBeat.holdMs = Math.max(1, lockBeat.holdMs + drift);
-      for (const beat of beats) {
-        if (beat.t > lockBeat.t) beat.t += drift;
-      }
+  applyDrift(beats, t0 + plan.budgetMs - t);
+
+  return { beats, durationMs: plan.budgetMs, lastTarget: victimId };
+}
+
+/* ------------------------------------------------------------------ */
+/* Hauptfunktion                                                       */
+/* ------------------------------------------------------------------ */
+
+export function buildShowScript(input: ChoreographyInput): ShowScript {
+  const { players, victimId, seed, durationPreset, deathId } = input;
+  const extraVictims = input.extraVictims ?? [];
+
+  if (players.length === 0) throw new RangeError('buildShowScript: keine Spieler.');
+  if (!players.includes(victimId)) {
+    throw new RangeError(`buildShowScript: Opfer ${victimId} ist nicht in der Spielerliste.`);
+  }
+  for (const extra of extraVictims) {
+    if (!players.includes(extra.victimId)) {
+      throw new RangeError(`buildShowScript: Opfer ${extra.victimId} ist nicht in der Spielerliste.`);
     }
-    t = target;
   }
 
-  /* --- Double Tap: Nachschlag ohne neuen Aufbau (GDD §4.2) --- */
+  const rng = createSeededRng(seed);
+  const phases = phaseDurations(durationPreset);
+
+  /* --- Der Aufbau: ein vollständiges Segment über alle Spieler --- */
+  const opening = buildSegment(
+    {
+      players,
+      victimId,
+      deathId,
+      phases,
+      budgetMs: DURATION_MS[durationPreset],
+      fakeCount: CHOREO.fakeLocksByPreset[durationPreset],
+      scanBeats: undefined,
+      panicHoldMs: CHOREO.panicHoldMs,
+      minPanicBeats: players.length === 2 ? CHOREO_FAIRNESS.minPanicBeatsTwoPlayers : 0,
+      previousTarget: undefined,
+    },
+    rng,
+    0
+  );
+
+  const beats: Beat[] = [...opening.beats];
+  let t = opening.durationMs;
+
+  /*
+   * Double Tap: Nachschlag ohne neuen Aufbau (GDD §4.2).
+   *
+   * Der zählt bewusst **nicht** in die Preset-Dauer: Das Preset beschreibt den Aufbau bis
+   * zum Schuss, und der ist bei zwei Opfern derselbe. Die Runde dauert dann eben länger
+   * — das ist der Modus.
+   */
   for (const extra of extraVictims) {
     beats.push({
       t,

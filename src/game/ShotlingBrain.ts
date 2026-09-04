@@ -60,6 +60,16 @@ export class ShotlingBrain {
   state: ShotlingState = 'walk';
   /** Wird von der Show gesetzt: Scan 1.0, Panik 1.6, Lock 0.4 (GDD §5.1). */
   speedMultiplier = 1;
+  /**
+   * Steht still und laesst sich auch nicht schieben — die Aufstellung vor dem Warnschuss
+   * (GDD §3.5, Intro-Inszenierung).
+   *
+   * `speedMultiplier = 0` reicht dafuer nicht: Die Zielgeschwindigkeit liefe nur
+   * exponentiell aus, `pickTarget()` tickte weiter, und vor allem drueckte
+   * `resolveOverlaps` die enge Reihe jeden Frame wieder auseinander. Deshalb ein eigenes
+   * Flag, das wie `dead` behandelt wird — nur eben reversibel.
+   */
+  frozen = false;
 
   private readonly centerX: number;
   private readonly centerY: number;
@@ -128,7 +138,7 @@ export class ShotlingBrain {
    * @param neighbours andere Gehirne fuer die Separation (darf die eigene Instanz enthalten)
    */
   update(dtMs: number, neighbours: readonly ShotlingBrain[] = EMPTY): void {
-    if (this.state === 'dead') return;
+    if (this.state === 'dead' || this.frozen) return;
 
     const dt = dtMs / 1000;
 
@@ -258,11 +268,11 @@ export function resolveOverlaps(brains: readonly ShotlingBrain[], minDistance?: 
 
     for (let i = 0; i < brains.length; i++) {
       const a = brains[i]!;
-      if (a.state === 'dead') continue;
+      if (a.state === 'dead' || a.frozen) continue;
 
       for (let j = i + 1; j < brains.length; j++) {
         const b = brains[j]!;
-        if (b.state === 'dead') continue;
+        if (b.state === 'dead' || b.frozen) continue;
 
         const limit = minDistance ?? Math.max(a.minDistance, b.minDistance);
         const dx = b.x - a.x;

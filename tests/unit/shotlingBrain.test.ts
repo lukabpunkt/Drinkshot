@@ -239,3 +239,64 @@ describe('ShotlingBrain — Verhalten', () => {
     expect(minPairDistance(brains)).toBeGreaterThan(50);
   });
 });
+
+describe('ShotlingBrain — eingefroren (Intro-Aufstellung)', () => {
+  it('bewegt sich nicht, solange `frozen` gesetzt ist', () => {
+    const brain = makeBrain(11);
+    brain.frozen = true;
+    const startX = brain.x;
+    const startY = brain.y;
+
+    for (let i = 0; i < 300; i++) brain.update(STEP_MS);
+
+    expect(brain.x).toBe(startX);
+    expect(brain.y).toBe(startY);
+    expect(brain.distanceWalked).toBe(0);
+  });
+
+  it('laeuft nach dem Auftauen wieder los', () => {
+    const brain = makeBrain(12);
+    brain.frozen = true;
+    for (let i = 0; i < 60; i++) brain.update(STEP_MS);
+    const frozenX = brain.x;
+
+    brain.frozen = false;
+    for (let i = 0; i < 120; i++) brain.update(STEP_MS);
+
+    expect(Math.abs(brain.x - frozenX)).toBeGreaterThan(0);
+    expect(brain.distanceWalked).toBeGreaterThan(20);
+  });
+
+  it('wird von `resolveOverlaps` nicht verschoben', () => {
+    /*
+     * Der eigentliche Grund für das Flag: Die Reihe steht enger als der Mindestabstand,
+     * und ohne diese Ausnahme drückte `resolveOverlaps` sie jeden Frame auseinander.
+     */
+    const a = makeBrain(1);
+    const b = makeBrain(2);
+    a.frozen = true;
+    b.frozen = true;
+    a.x = 500;
+    a.y = 500;
+    b.x = 540; // deutlich enger als SEPARATION_DISTANCE
+    b.y = 500;
+
+    for (let i = 0; i < 10; i++) resolveOverlaps([a, b]);
+
+    expect(a.x).toBe(500);
+    expect(b.x).toBe(540);
+  });
+
+  it('schiebt aber weiterhin die auseinander, die nicht eingefroren sind', () => {
+    const a = makeBrain(3);
+    const b = makeBrain(4);
+    a.x = 500;
+    a.y = 500;
+    b.x = 510;
+    b.y = 500;
+
+    for (let i = 0; i < 10; i++) resolveOverlaps([a, b]);
+
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(100);
+  });
+});

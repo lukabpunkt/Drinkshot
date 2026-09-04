@@ -180,7 +180,24 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   let releaseWakeLock: (() => void) | undefined;
   let offLayout: (() => void) | undefined;
   let tickerFn: ((ticker: { deltaMS: number }) => void) | undefined;
-  let onVisibility: (() => void) | undefined;
+  /*
+   * Tab-Wechsel: pausieren statt weiterlaufen (Audit A3).
+   *
+   * Der Handler wird **sofort** registriert, nicht erst nach dem Aufbau des Directors:
+   * Alles davor — Atlas laden, Arena bauen, die Intro-Inszenierung — liefe sonst im
+   * Hintergrund ungebremst weiter, samt Ton.
+   */
+  const onVisibility = (): void => {
+    if (document.hidden) {
+      director?.pause();
+      audio.suspendAudio();
+    } else {
+      audio.resumeAudio();
+      director?.resume();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
 
   const finish = (): void => {
     if (finished || disposed) return;
@@ -238,6 +255,25 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   }
 
   async function build(): Promise<void> {
+    /*
+     * `failGracefully` bietet einen zweiten Anlauf an — der ruft `build()` erneut. Ohne
+     * dieses Aufräumen bliebe die alte `tickerFn` für immer im PIXI-Ticker: Zwei
+     * Simulationen liefen dann parallel über dieselben Männchen, und die Todes-Timelines
+     * des ersten Aufbaus liefen weiter, obwohl ihre Sprites längst aus der Welt entfernt
+     * sind.
+     */
+    if (handle && tickerFn) handle.app.ticker.remove(tickerFn);
+    tickerFn = undefined;
+    director?.destroy();
+    director = undefined;
+    scope?.destroy();
+    scope = undefined;
+    particles?.destroy();
+    particles = undefined;
+    camera?.reset();
+    offLayout?.();
+    offLayout = undefined;
+
     let assets;
     try {
       assets = await loadAssetsWithRetry();
@@ -434,13 +470,6 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       },
     });
 
-    /* --- Tab-Wechsel: pausieren statt weiterlaufen (Audit A3) --- */
-    onVisibility = () => {
-      if (document.hidden) director?.pause();
-      else director?.resume();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
     if (ctx.dev) {
       /**
        * Death-Preview (Architektur §9): baut die gewählte Sequenz auf dem Opfer neu auf.
@@ -528,7 +557,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       disposed = true;
       stopLockPulse();
       if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
-      if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
       releaseWakeLock?.();
       offLayout?.();
       devPanel?.destroy();

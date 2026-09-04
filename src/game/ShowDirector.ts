@@ -33,6 +33,13 @@ export interface ShowDirectorOptions {
   rng: SeededRng;
   /** Alle Männchen, nach PlayerId. */
   shotlings: Map<PlayerId, Shotling>;
+  /**
+   * Spielt der `intro`-Beat den `scope_open`-Cue? Default `true`.
+   *
+   * Lief davor die Intro-Inszenierung, hat sie den Sound beim Öffnen der Blende schon
+   * gespielt — ein zweites Mal wäre ein Echo.
+   */
+  playIntroCue?: boolean;
   /** Wird nach dem Outro gerufen — die FSM schaltet dann auf RESULT. */
   onFinished: () => void;
   /**
@@ -154,7 +161,7 @@ export class ShowDirector {
         case 'intro':
           timeline.call(
             () => {
-              audio.play('scope_open');
+              if (this.options.playIntroCue ?? true) audio.play('scope_open');
               this.setPhaseSpeed(ARENA.speed.scan);
               const first = [...shotlings.values()][0];
               if (first) scope.snapTo(first.aimPoint);

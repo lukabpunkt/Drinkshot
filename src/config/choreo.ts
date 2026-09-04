@@ -103,6 +103,54 @@ export const CHOREO = {
 /* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
+/* Intro-Inszenierung (GDD §3.5)                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Der Auftakt vor der eigentlichen Show: Man sieht den Schuetzen von vorne, die Kamera
+ * faehrt in sein Zielfernrohr, die Blende oeffnet sich — und die Maennchen stehen noch
+ * in einer Reihe, bis ein Warnschuss neben ihnen einschlaegt.
+ *
+ * Die Zeiten kommen **obendrauf**, sie sind nicht Teil des Dauer-Presets: Das Preset
+ * beschreibt den Aufbau bis zum Schuss, und der ist unveraendert. Dieselbe Regel gilt
+ * fuer den Double-Tap-Nachschlag und die Showdown-Kaskade.
+ *
+ * Ab der zweiten Runde laeuft nur noch der Kurzteil (Reihe, Warnschuss, Auseinander) —
+ * ein siebensekuendiger Vorspann vor jeder Runde waere am achten Abend nur noch Wartezeit.
+ */
+export const INTRO = {
+  /** Wie lange man den Schuetzen frontal sieht. */
+  sniperHoldMs: 3000,
+  /** Fahrt in die Linse hinein, bis sie den Scope-Kreis fuellt. */
+  pushMs: 1100,
+  /** Wie weit die Linse zu Beginn kleiner ist als am Ende. */
+  pushFactor: 2.6,
+  /** Linsen-Innenradius im lokalen Massstab des Schuetzen-Containers. */
+  lensRadiusPx: 110,
+  /** Ruhe, bevor der Warnschuss faellt — das Fadenkreuz wandert ueber die Reihe. */
+  rowHoldMs: 900,
+  /** Vom Knall bis zum Losstieben. */
+  warningShotMs: 260,
+  /** Wie lange die Maennchen nach dem Warnschuss sprinten. */
+  scatterMs: 700,
+
+  /** Abstand zweier Maennchen in der Reihe, als Anteil ihrer Hoehe. */
+  rowSpacingFactor: 0.55,
+  /** Tiefenversatz zwischen vorderer und hinterer Reihe (ab 7 Spielern). */
+  rowDepthFactor: 0.42,
+  /**
+   * Wie weit die Reihe hoechstens aus der Mitte reichen darf, als Anteil des Laufradius.
+   * Nicht 1.0: Ab 0.9 lenkt der Brain vom Rand weg, und beim Auftauen risse
+   * `clampToZone()` die Aeusseren sichtbar zurueck.
+   */
+  maxHalfSpanFactor: 0.86,
+  /** Wie weit die Reihe hinter der Arenamitte steht, als Anteil der Hoehe. */
+  rowOffsetFactor: 0.15,
+  /** Wie weit vor den Fuessen des Aeussersten der Warnschuss einschlaegt. */
+  warningShotAheadFactor: 0.8,
+} as const;
+
+/* ------------------------------------------------------------------ */
 /* Showdown-Kaskade (GDD §3.6, Roadmap M5b)                            */
 /* ------------------------------------------------------------------ */
 

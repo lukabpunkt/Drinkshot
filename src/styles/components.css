@@ -1881,3 +1881,11 @@
   background: transparent;
   cursor: pointer;
 }
+
+.ready__standing {
+  margin: 0;
+  color: var(--c-accent);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  letter-spacing: 0.04em;
+}

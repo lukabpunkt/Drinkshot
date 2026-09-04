@@ -8,8 +8,15 @@
  * BET → ARENA. ARENA liest nur, entscheidet nichts.
  */
 
-import { MAX_BET, MIN_BET, MIN_PLAYERS, type DurationPreset, type GameMode } from '@/config/rules';
-import type { Bet, PlayerId } from './lottery';
+import {
+  MAX_BET,
+  MIN_BET,
+  MIN_PLAYERS,
+  MODE_SPECS,
+  type DurationPreset,
+  type GameMode,
+} from '@/config/rules';
+import { totalSips, type Bet, type PlayerId } from './lottery';
 import { createRoundSetup, type RoundSetup } from './session';
 
 export const GAME_STATES = ['TITLE', 'LOBBY', 'PASS', 'BET', 'READY', 'ARENA', 'RESULT'] as const;
@@ -28,7 +35,7 @@ export type GameEvent =
   | { type: 'startShow' }
   /** ARENA → RESULT */
   | { type: 'showFinished' }
-  /** RESULT → PASS(0) */
+  /** RESULT → PASS(0), im laufenden Turnier direkt RESULT → READY */
   | { type: 'nextRound' }
   /** RESULT → LOBBY */
   | { type: 'changePlayers' }
@@ -52,6 +59,14 @@ export interface FsmContext {
   durationPreset: DurationPreset;
   /** Zaehlt abgeschlossene Runden der Session (fuer die HUD-Zeile "ROUND 3"). */
   roundNumber: number;
+  /**
+   * Summe aller Einsaetze des laufenden Turniers.
+   *
+   * In Sudden Death schrumpft `bets` mit dem Teilnehmerfeld — der Letzte verteilt aber die
+   * Summe aller urspruenglichen Einsaetze (ADR-53). Ausserhalb eines Turniers ist das
+   * schlicht die Summe von `bets`.
+   */
+  potSips: number;
 }
 
 export interface Transition {
@@ -71,7 +86,12 @@ export interface FsmOptions {
   mode?: GameMode;
   durationPreset?: DurationPreset;
   /** Injizierbar fuer Tests; produktiv `createRoundSetup` (nutzt `pickVictim`). */
-  drawRound?: (bets: readonly Bet[], mode: GameMode, duration: DurationPreset) => RoundSetup;
+  drawRound?: (
+    bets: readonly Bet[],
+    mode: GameMode,
+    duration: DurationPreset,
+    potSips: number
+  ) => RoundSetup;
   /** M0: reines Logging. Ab M1 uebernimmt der Router. */
   onTransition?: (transition: Transition) => void;
 }
@@ -103,7 +123,10 @@ const ALLOWED: Record<GameState, readonly GameEventType[]> = {
 };
 
 export function createFsm(options: FsmOptions = {}): Fsm {
-  const drawRound = options.drawRound ?? createRoundSetup;
+  const drawRound =
+    options.drawRound ??
+    ((bets: readonly Bet[], mode: GameMode, duration: DurationPreset, potSips: number) =>
+      createRoundSetup(bets, mode, duration, undefined, potSips));
 
   const context: FsmContext = {
     players: options.players ? [...options.players] : [],
@@ -113,6 +136,7 @@ export function createFsm(options: FsmOptions = {}): Fsm {
     mode: options.mode ?? 'classic',
     durationPreset: options.durationPreset ?? 'normal',
     roundNumber: 0,
+    potSips: 0,
   };
 
   let state: GameState = 'TITLE';
@@ -134,7 +158,24 @@ export function createFsm(options: FsmOptions = {}): Fsm {
     context.playerIndex = 0;
     context.bets = [];
     context.round = null;
+    context.potSips = 0;
   };
+
+  /**
+   * Traegt die Runde die Einsaetze der vorigen weiter?
+   *
+   * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen, bis einer
+   * steht (ADR-53). Das haengt an `MODE_SPECS[...].eliminates`: Ein Modus, der ausscheiden
+   * laesst, spielt ein Turnier — und ein Turnier setzt am Anfang, nicht vor jeder Runde.
+   *
+   * Die Bedingung beendet sich von selbst. Ist das Turnier entschieden, gibt
+   * `activePlayers()` wieder alle zurueck (ADR-54); fuer die meisten davon gibt es keinen
+   * Einsatz mehr, und es geht wie gewohnt in eine frische Setzphase.
+   */
+  const carriesStakes = (): boolean =>
+    MODE_SPECS[context.mode].eliminates &&
+    context.players.length >= MIN_PLAYERS &&
+    context.players.every((id) => context.bets.some((bet) => bet.playerId === id));
 
   const transition = (to: GameState, event: GameEvent): void => {
     const from = state;
@@ -167,7 +208,7 @@ export function createFsm(options: FsmOptions = {}): Fsm {
         return 'RESULT';
 
       case 'nextRound':
-        return 'PASS';
+        return carriesStakes() ? 'READY' : 'PASS';
 
       case 'changePlayers':
         return 'LOBBY';
@@ -190,6 +231,13 @@ export function createFsm(options: FsmOptions = {}): Fsm {
         return;
 
       case 'nextRound':
+        if (carriesStakes()) {
+          // Die Ausgeschiedenen fallen aus der Ziehung; der Topf bleibt, wie er war.
+          context.bets = context.bets.filter((bet) => context.players.includes(bet.playerId));
+          context.playerIndex = 0;
+          context.round = null;
+          return;
+        }
         resetRound();
         return;
 
@@ -197,6 +245,8 @@ export function createFsm(options: FsmOptions = {}): Fsm {
         const playerId = context.players[context.playerIndex]!;
         context.bets.push({ playerId, sips: event.sips });
         if (target === 'PASS') context.playerIndex += 1;
+        // Mit dem letzten Einsatz steht der Topf — im Turnier fuer alle folgenden Runden.
+        else context.potSips = totalSips(context.bets);
         return;
       }
 
@@ -208,7 +258,12 @@ export function createFsm(options: FsmOptions = {}): Fsm {
        * aus READY abbricht, hat nie gezogen (ADR-42).
        */
       case 'startShow':
-        context.round = drawRound(context.bets, context.mode, context.durationPreset);
+        context.round = drawRound(
+          context.bets,
+          context.mode,
+          context.durationPreset,
+          context.potSips
+        );
         drawCount += 1;
         return;
 

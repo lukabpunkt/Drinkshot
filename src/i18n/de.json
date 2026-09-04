@@ -64,7 +64,8 @@
     "headline": "Alle haben gesetzt",
     "putDown": "Legt das Handy in die Mitte",
     "players": "{count} Spieler dabei",
-    "start": "Los!"
+    "start": "Los!",
+    "stillIn": "Noch {count} im Rennen"
   },
   "arena": {
     "hud": "RUNDE {round} · {count} ZIELE",
@@ -106,7 +107,8 @@
       "butt": "Volltreffer, Hosenboden!",
       "miss": "Erst daneben. Dann doch nicht.",
       "miracle": "Glück gehabt!"
-    }
+    },
+    "continue": "Weiter"
   },
   "settings": {
     "headline": "Einstellungen",

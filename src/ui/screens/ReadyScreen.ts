@@ -15,6 +15,7 @@ import { READY_ARM_MS } from '@/config/rules';
 import { t } from '@/core/i18n';
 import { createButton, createChip, createIconButton, ICON_CLOSE } from '@/ui/components/button';
 import { createPlayerBadge } from '@/ui/components/badge';
+import { eliminatedPlayerIds } from '@/core/session';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
 
@@ -47,6 +48,19 @@ export function createReadyScreen(ctx: ScreenContext): ScreenInstance {
     if (!player) continue;
     roster.append(createPlayerBadge({ colorId: player.colorId, size: 'sm' }));
   }
+
+  /*
+   * Im laufenden Turnier steht hier, wie viele noch im Rennen sind — sonst kaeme man aus
+   * dem Ergebnis direkt hierher, ohne Setzphase, und wuesste nicht, worauf man schaut.
+   *
+   * Bewusst **nur die Anzahl, nie der Topf**: Ab dem Bestaetigen ist keine Einsatzzahl
+   * mehr sichtbar (Audit A1, MUSS). Bei zwei Verbliebenen liesse sich aus der Summe der
+   * Einsatz des anderen ausrechnen.
+   */
+  const standing = document.createElement('p');
+  standing.className = 'ready__standing';
+  standing.textContent = t('ready.stillIn', { count: players.length });
+  standing.hidden = eliminatedPlayerIds(ctx.session.state).size === 0;
 
   /* --- Der eigentliche Zweck dieses Screens --- */
   const putDown = document.createElement('p');
@@ -89,7 +103,7 @@ export function createReadyScreen(ctx: ScreenContext): ScreenInstance {
     onClick: ctx.abortRound,
   });
 
-  el.append(exit, headline, roster, putDown, chips, modeHint, start);
+  el.append(exit, headline, roster, standing, putDown, chips, modeHint, start);
 
   let armTimer: ReturnType<typeof setTimeout> | undefined;
 

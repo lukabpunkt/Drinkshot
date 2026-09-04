@@ -10,7 +10,7 @@ import { MIN_PLAYERS } from '@/config/rules';
 import { colorById, hex, MOTION, UI_COLORS } from '@/config/theme';
 import { plural, t } from '@/core/i18n';
 import * as audio from '@/audio/AudioManager';
-import type { RoundResult } from '@/core/session';
+import { eliminatedPlayerIds, type RoundResult } from '@/core/session';
 import { countUp, growBar, prefersReducedMotion } from '@/ui/animate';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { createButton } from '@/ui/components/button';
@@ -72,12 +72,14 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   const isMiracle = round.zone === 'miracle';
   const isShowdown = round.mode === 'showdown';
+  /** Ist die Runde entschieden, steht am Ende genau einer — Showdown wie Sudden Death. */
+  const winnerId = round.winnerId;
 
   /*
-   * Wer steht im Mittelpunkt? Normalerweise das Opfer — im Showdown der **Überlebende**.
-   * Dort sind fast alle Opfer; die Geschichte ist, wer noch steht.
+   * Wer steht im Mittelpunkt? Normalerweise das Opfer — ist die Runde entschieden, der
+   * **Überlebende**. Dort sind fast alle Opfer; die Geschichte ist, wer noch steht.
    */
-  const heroId = isShowdown ? (round.winnerId ?? round.victimId) : round.victimId;
+  const heroId = winnerId ?? round.victimId;
   const victim = ctx.session.playerById(heroId);
   const victimColor = victim ? colorById(victim.colorId) : colorById('red');
 
@@ -134,7 +136,7 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
     badge.className = 'result__legend';
     badge.textContent = t('result.miracleBadge');
     reveal.append(badge);
-  } else if (isShowdown && round.winnerId !== undefined) {
+  } else if (winnerId !== undefined) {
     const badge = document.createElement('p');
     badge.className = 'result__legend result__crown';
     badge.textContent = t('result.survivorBadge');
@@ -175,8 +177,14 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   const canContinue = ctx.session.activePlayers().length >= MIN_PLAYERS;
 
+  /*
+   * Läuft ein Turnier noch, ist die nächste Runde keine neue Runde, sondern der nächste
+   * Schuss — und niemand setzt dafür neu (ADR-53). Der Knopf sagt das.
+   */
+  const inTournament = eliminatedPlayerIds(ctx.session.state).size > 0;
+
   const next = createButton({
-    label: t('result.nextRound'),
+    label: inTournament ? t('result.continue') : t('result.nextRound'),
     variant: 'primary',
     wobble: canContinue,
     className: 'btn--block',
@@ -251,7 +259,7 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 function headlineText(round: RoundResult, ctx: ScreenContext): string {
   if (round.zone === 'miracle') return t('result.miracle');
 
-  if (round.mode === 'showdown' && round.winnerId !== undefined) {
+  if (round.winnerId !== undefined) {
     const winner = ctx.session.playerById(round.winnerId);
     return t('result.survives', { name: winner?.name ?? '' });
   }
@@ -296,15 +304,24 @@ function subText(round: RoundResult, ctx: ScreenContext): string {
   }
 
   if (round.mode === 'suddenDeath') {
+    const victimName = ctx.session.playerById(round.victimId)?.name ?? '';
     if (round.winnerId !== undefined) {
-      const name = ctx.session.playerById(round.winnerId)?.name ?? '';
-      return t('result.winner', {
-        name,
+      /*
+       * Die Kopfzeile gehört jetzt dem Überlebenden — der letzte Getroffene käme sonst
+       * gar nicht mehr vor. Deshalb hier beides: wer trinkt und wer verteilt.
+       */
+      const own = round.drinkers.find((drinker) => drinker.playerId === round.victimId)?.sips ?? 0;
+      const drinks = t('result.drinks', {
+        name: victimName,
+        sips: plural('common.sipsCount', own),
+      });
+      const winner = t('result.winner', {
+        name: ctx.session.playerById(round.winnerId)?.name ?? '',
         sips: plural('common.sipsCount', round.sipsToDistribute ?? 0),
       });
+      return `${drinks} ${winner}`;
     }
-    const name = ctx.session.playerById(round.victimId)?.name ?? '';
-    return t('result.eliminated', { name });
+    return t('result.eliminated', { name: victimName });
   }
 
   return '';

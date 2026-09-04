@@ -64,7 +64,8 @@
     "headline": "Everyone's in",
     "putDown": "Put the phone in the middle",
     "players": "{count} players in",
-    "start": "Go!"
+    "start": "Go!",
+    "stillIn": "{count} still standing"
   },
   "arena": {
     "hud": "ROUND {round} · {count} TARGETS",
@@ -106,7 +107,8 @@
       "butt": "Bullseye, right in the seat!",
       "miss": "Missed. Then didn't.",
       "miracle": "Lucky one!"
-    }
+    },
+    "continue": "Continue"
   },
   "settings": {
     "headline": "Settings",

@@ -30,10 +30,7 @@ function makeFsm(players = PLAYERS): Fsm {
 }
 
 /** Spielt bis zum gewuenschten State durch. */
-function advanceTo(
-  fsm: Fsm,
-  target: 'LOBBY' | 'PASS' | 'BET' | 'READY' | 'ARENA' | 'RESULT'
-): Fsm {
+function advanceTo(fsm: Fsm, target: 'LOBBY' | 'PASS' | 'BET' | 'READY' | 'ARENA' | 'RESULT'): Fsm {
   fsm.send({ type: 'start' });
   if (target === 'LOBBY') return fsm;
   fsm.send({ type: 'begin' });
@@ -306,8 +303,97 @@ describe('FSM — Setter', () => {
         { playerId: 'b', sips: 2 },
       ],
       'doubleTap',
-      'short'
+      'short',
+      3
     );
+  });
+});
+
+describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-53)', () => {
+  const PLAYERS = ['a', 'b', 'c'];
+
+  /** Spielt eine Setzphase durch und startet die Show. */
+  function betAll(fsm: Fsm, sips: number[]): void {
+    for (const value of sips) {
+      fsm.send({ type: 'tap' });
+      fsm.send({ type: 'confirm', sips: value });
+    }
+    fsm.send({ type: 'startShow' });
+    fsm.send({ type: 'showFinished' });
+  }
+
+  function tournament(): Fsm {
+    const fsm = createFsm({ players: PLAYERS, mode: 'suddenDeath', drawRound: fakeDraw });
+    fsm.send({ type: 'start' });
+    fsm.send({ type: 'begin' });
+    betAll(fsm, [1, 2, 3]);
+    return fsm;
+  }
+
+  it('geht nach der ersten Runde direkt nach READY statt in die Setzphase', () => {
+    const fsm = tournament();
+    fsm.setPlayers(['a', 'b']);
+    fsm.send({ type: 'nextRound' });
+
+    expect(fsm.state).toBe('READY');
+    expect(fsm.context.bets).toEqual([
+      { playerId: 'a', sips: 1 },
+      { playerId: 'b', sips: 2 },
+    ]);
+  });
+
+  it('haelt den Topf des Turniers fest, waehrend die Einsaetze schrumpfen', () => {
+    const draw = vi.fn(fakeDraw);
+    const fsm = createFsm({ players: PLAYERS, mode: 'suddenDeath', drawRound: draw });
+    fsm.send({ type: 'start' });
+    fsm.send({ type: 'begin' });
+    betAll(fsm, [1, 2, 3]);
+
+    fsm.setPlayers(['a', 'b']);
+    fsm.send({ type: 'nextRound' });
+    fsm.send({ type: 'startShow' });
+
+    expect(draw).toHaveBeenLastCalledWith(
+      [
+        { playerId: 'a', sips: 1 },
+        { playerId: 'b', sips: 2 },
+      ],
+      'suddenDeath',
+      'normal',
+      6
+    );
+  });
+
+  it('geht in eine frische Setzphase, sobald wieder alle antreten', () => {
+    const fsm = tournament();
+    // Turnier entschieden: `activePlayers()` liefert wieder das volle Feld (ADR-54).
+    fsm.setPlayers(PLAYERS);
+    fsm.send({ type: 'nextRound' });
+
+    expect(fsm.state).toBe('READY');
+
+    // Gegenprobe mit einem Spieler, der nie gesetzt hat.
+    const fresh = createFsm({ players: [...PLAYERS, 'd'], mode: 'suddenDeath', drawRound: fakeDraw });
+    fresh.send({ type: 'start' });
+    fresh.send({ type: 'begin' });
+    betAll(fresh, [1, 2, 3, 4]);
+    fresh.setPlayers([...PLAYERS, 'e']);
+    fresh.send({ type: 'nextRound' });
+
+    expect(fresh.state).toBe('PASS');
+    expect(fresh.context.bets).toEqual([]);
+    expect(fresh.context.potSips).toBe(0);
+  });
+
+  it('traegt die Einsaetze in Modi ohne Ausscheiden nicht weiter', () => {
+    const fsm = createFsm({ players: PLAYERS, mode: 'classic', drawRound: fakeDraw });
+    fsm.send({ type: 'start' });
+    fsm.send({ type: 'begin' });
+    betAll(fsm, [1, 2, 3]);
+    fsm.send({ type: 'nextRound' });
+
+    expect(fsm.state).toBe('PASS');
+    expect(fsm.context.bets).toEqual([]);
   });
 });
 

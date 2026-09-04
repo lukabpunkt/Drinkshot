@@ -33,7 +33,9 @@ export type GameEvent =
   /** RESULT → LOBBY */
   | { type: 'changePlayers' }
   /** PASS/BET/READY/ARENA → LOBBY (Back-Button / "Runde abbrechen?") */
-  | { type: 'cancel' };
+  | { type: 'cancel' }
+  /** Alles ausser TITLE → TITLE ("Hauptmenue"). Bricht auch ein laufendes Turnier ab. */
+  | { type: 'quit' };
 
 export type GameEventType = GameEvent['type'];
 
@@ -92,12 +94,12 @@ export interface Fsm {
 /** Welche Events sind in welchem State ueberhaupt zulaessig? */
 const ALLOWED: Record<GameState, readonly GameEventType[]> = {
   TITLE: ['start'],
-  LOBBY: ['begin'],
-  PASS: ['tap', 'cancel'],
-  BET: ['confirm', 'cancel'],
-  READY: ['startShow', 'cancel'],
-  ARENA: ['showFinished', 'cancel'],
-  RESULT: ['nextRound', 'changePlayers'],
+  LOBBY: ['begin', 'quit'],
+  PASS: ['tap', 'cancel', 'quit'],
+  BET: ['confirm', 'cancel', 'quit'],
+  READY: ['startShow', 'cancel', 'quit'],
+  ARENA: ['showFinished', 'cancel', 'quit'],
+  RESULT: ['nextRound', 'changePlayers', 'quit'],
 };
 
 export function createFsm(options: FsmOptions = {}): Fsm {
@@ -172,6 +174,9 @@ export function createFsm(options: FsmOptions = {}): Fsm {
 
       case 'cancel':
         return 'LOBBY';
+
+      case 'quit':
+        return 'TITLE';
     }
   };
 
@@ -179,6 +184,11 @@ export function createFsm(options: FsmOptions = {}): Fsm {
   const applyEffects = (event: GameEvent, target: GameState): void => {
     switch (event.type) {
       case 'begin':
+        // Neue Partie, neue Zaehlung — sonst zeigt das HUD "ROUND 7" in Runde 1.
+        context.roundNumber = 0;
+        resetRound();
+        return;
+
       case 'nextRound':
         resetRound();
         return;
@@ -208,6 +218,16 @@ export function createFsm(options: FsmOptions = {}): Fsm {
 
       case 'cancel':
         resetRound();
+        return;
+
+      /*
+       * Zurueck ans Lagerfeuer. Bis hierher gab es diesen Weg nicht — kein Event hatte
+       * TITLE als Ziel, und wer einmal "Spielen" gedrueckt hatte, kam bis zum Neuladen
+       * nicht mehr zurueck (ADR-55).
+       */
+      case 'quit':
+        resetRound();
+        context.roundNumber = 0;
         return;
 
       case 'start':

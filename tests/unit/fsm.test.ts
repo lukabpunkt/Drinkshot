@@ -161,16 +161,17 @@ describe('FSM — unzulaessige Events', () => {
     { type: 'changePlayers' },
     { type: 'cancel' },
     { type: 'startShow' },
+    { type: 'quit' },
   ];
 
   const ALLOWED: Record<string, string[]> = {
     TITLE: ['start'],
-    LOBBY: ['begin'],
-    PASS: ['tap', 'cancel'],
-    BET: ['confirm', 'cancel'],
-    READY: ['startShow', 'cancel'],
-    ARENA: ['showFinished', 'cancel'],
-    RESULT: ['nextRound', 'changePlayers'],
+    LOBBY: ['begin', 'quit'],
+    PASS: ['tap', 'cancel', 'quit'],
+    BET: ['confirm', 'cancel', 'quit'],
+    READY: ['startShow', 'cancel', 'quit'],
+    ARENA: ['showFinished', 'cancel', 'quit'],
+    RESULT: ['nextRound', 'changePlayers', 'quit'],
   };
 
   it.each(GAME_STATES)('in %s werden nur die erlaubten Events angenommen', (state) => {
@@ -369,5 +370,38 @@ describe('FSM — Ziehung genau einmal (ADR-2)', () => {
 
     fsm.send({ type: 'startShow' });
     expect(fsm.context.round).not.toBeNull();
+  });
+});
+
+describe('quit — der Weg zurueck ins Hauptmenue (ADR-55)', () => {
+  it.each(['LOBBY', 'PASS', 'BET', 'READY', 'ARENA', 'RESULT'] as const)(
+    'fuehrt aus %s an den Titel',
+    (state) => {
+      const fsm = makeFsm();
+      advanceTo(fsm, state);
+      expect(fsm.send({ type: 'quit' })).toBe(true);
+      expect(fsm.state).toBe('TITLE');
+    }
+  );
+
+  it('raeumt Einsaetze, Runde und Rundenzaehler ab', () => {
+    const fsm = makeFsm();
+    advanceTo(fsm, 'RESULT');
+    expect(fsm.context.roundNumber).toBe(1);
+
+    fsm.send({ type: 'quit' });
+    expect(fsm.context.bets).toEqual([]);
+    expect(fsm.context.round).toBeNull();
+    expect(fsm.context.roundNumber).toBe(0);
+  });
+
+  it('setzt den Rundenzaehler auch bei einer neuen Partie zurueck', () => {
+    const fsm = makeFsm();
+    advanceTo(fsm, 'RESULT');
+    fsm.send({ type: 'changePlayers' });
+    expect(fsm.context.roundNumber).toBe(1);
+
+    fsm.send({ type: 'begin' });
+    expect(fsm.context.roundNumber).toBe(0);
   });
 });

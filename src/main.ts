@@ -127,7 +127,7 @@ fsm.on('RESULT', {
 const host = document.querySelector<HTMLElement>('#app');
 if (!host) throw new Error('#app fehlt in index.html');
 
-const router = createRouter({ host, context: { fsm, session, dev } });
+const router = createRouter({ host, context: { fsm, session, dev, abortRound: requestAbortRound } });
 
 router.register('title', createTitleScreen);
 router.register('lobby', createLobbyScreen);
@@ -221,7 +221,7 @@ function wipeColor(state: GameState): string {
   return hex(UI_COLORS.accent);
 }
 
-const BACK_EVENTS = new Set(['cancel', 'changePlayers']);
+const BACK_EVENTS = new Set(['cancel', 'changePlayers', 'quit']);
 
 /**
  * Vorladen in zwei Stufen (Architektur §7.12, Roadmap M5.10):
@@ -265,46 +265,76 @@ fsm.subscribe(({ to, event }) => {
 /** In diesen States kostet ein Zurück die laufende Runde — also erst fragen. */
 const GUARDED: ReadonlySet<GameState> = new Set<GameState>(['PASS', 'BET', 'READY', 'ARENA']);
 
-let guarded = false;
+/*
+ * Wieviele eigene History-Einträge wir gerade halten.
+ *
+ * Vorher war das ein Boolean, und die Einträge leckten: Beim Verlassen eines geschützten
+ * States wurde nur das Flag gelöscht, der Eintrag blieb im Stack — und jedes
+ * "Weiterspielen" legte einen weiteren obendrauf. In der Lobby verpufften Zurück-Drücke
+ * dann sichtbar folgenlos, die App wirkte eingefroren.
+ */
+let guardDepth = 0;
+let unwinding = 0;
 let dialogOpen = false;
 
 function pushGuard(): void {
   globalThis.history?.pushState({ drinkshot: 'round' }, '');
-  guarded = true;
+  guardDepth += 1;
 }
 
 function updateHistoryGuard(state: GameState): void {
   if (GUARDED.has(state)) {
-    if (!guarded) pushGuard();
-  } else {
-    guarded = false;
+    if (guardDepth === 0) pushGuard();
+    return;
   }
+  if (guardDepth === 0) return;
+
+  // Aufräumen: die eigenen Einträge in einem Rutsch zurückgeben. Die dadurch
+  // ausgelösten `popstate`-Ereignisse verschluckt der Zähler unten.
+  unwinding += guardDepth;
+  const depth = guardDepth;
+  guardDepth = 0;
+  globalThis.history?.go(-depth);
+}
+
+/** Fragt nach und bricht die laufende Runde ab. Auch die ✕-Knöpfe der Screens rufen das. */
+function requestAbortRound(): void {
+  if (dialogOpen) return;
+  dialogOpen = true;
+  void confirmSheet({
+    title: t('arena.abortRound'),
+    body: t('arena.abortBody'),
+    confirmLabel: t('arena.abortConfirm'),
+    cancelLabel: t('arena.abortCancel'),
+  }).then((confirmed) => {
+    dialogOpen = false;
+    if (!confirmed) return;
+    /*
+     * Endet die Show, während der Dialog offen steht, stehen wir längst in RESULT —
+     * dort ist `cancel` nicht erlaubt und `send` gäbe still `false` zurück. Der Nutzer
+     * tippte "Ja, abbrechen" und nichts passierte.
+     */
+    if (!fsm.send({ type: 'cancel' })) fsm.send({ type: 'changePlayers' });
+  });
 }
 
 globalThis.addEventListener('popstate', () => {
+  if (unwinding > 0) {
+    unwinding -= 1;
+    return;
+  }
+
   const state = fsm.state;
 
   if (GUARDED.has(state)) {
-    if (dialogOpen) return;
     // Erst den Eintrag zurücklegen, damit wir stehen bleiben, während gefragt wird.
-    pushGuard();
-    dialogOpen = true;
-    void confirmSheet({
-      title: t('arena.abortRound'),
-      body: t('arena.abortBody'),
-      confirmLabel: t('arena.abortConfirm'),
-      cancelLabel: t('arena.abortCancel'),
-    }).then((confirmed) => {
-      dialogOpen = false;
-      if (confirmed) {
-        guarded = false;
-        fsm.send({ type: 'cancel' });
-      }
-    });
+    if (!dialogOpen) pushGuard();
+    requestAbortRound();
     return;
   }
 
   if (state === 'RESULT') fsm.send({ type: 'changePlayers' });
+  else if (state === 'LOBBY') fsm.send({ type: 'quit' });
 });
 
 /* ------------------------------------------------------------------ */

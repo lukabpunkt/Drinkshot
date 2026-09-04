@@ -296,13 +296,31 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
               onClick: () => {
                 if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
                 el.classList.add('is-loading');
-                void build().then(() => el.classList.remove('is-loading'));
+                runBuild();
               },
             },
           }
         : {}),
     });
     fallbackTimer = globalThis.setTimeout(finish, ERROR_TOAST_MS);
+  }
+
+  /**
+   * Startet den Aufbau — und faengt ihn ab.
+   *
+   * `build()` hat zwei innere `try`-Bloecke, aber alles ausserhalb davon (etwa `new Arena`
+   * oder `buildShowScript`) fiel bisher durch: Die Promise wurde rejected und nirgends
+   * gefangen, `is-loading` blieb stehen (Deckkraft 0) und kein Notausgang-Timer lief.
+   * Ergebnis war ein schwarzer Bildschirm ohne jeden Knopf.
+   */
+  function runBuild(): void {
+    build().then(
+      () => el.classList.remove('is-loading'),
+      (error: unknown) => {
+        el.classList.remove('is-loading');
+        if (!disposed) failGracefully('error.generic', error, false);
+      }
+    );
   }
 
   async function build(): Promise<void> {
@@ -675,7 +693,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     activate() {
       releaseWakeLock = requestWakeLock();
       if (!areArenaAssetsReady()) el.classList.add('is-loading');
-      void build().then(() => el.classList.remove('is-loading'));
+      runBuild();
     },
     destroy() {
       disposed = true;

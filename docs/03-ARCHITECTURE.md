@@ -140,7 +140,11 @@ Drinkshot/
    │         │  BET     │                      │
    │         └────┬─────┘                      │
    │   confirm    │  i < n-1 → PASS(i+1)       │
-   │              │  i = n-1 → drawVictim()    │
+   │              │  i = n-1 → READY           │
+   │         ┌────▼─────┐                      │
+   │         │  READY   │  "Handy in die Mitte"│
+   │         └────┬─────┘                      │
+   │   startShow  │  drawVictim()              │
    │         ┌────▼─────┐                      │
    │         │  ARENA   │  ShowDirector läuft  │
    │         └────┬─────┘                      │
@@ -154,7 +158,7 @@ Drinkshot/
 
 **Übergangsregeln:**
 
-- `drawVictim()` wird **genau einmal** beim Übergang BET→ARENA aufgerufen und legt `round.victimId`, `round.deathId`, `round.seed` fest. ARENA liest nur, entscheidet nichts.
+- `drawVictim()` wird **genau einmal** beim Übergang READY→ARENA aufgerufen und legt `round.victimId`, `round.deathId`, `round.seed` fest. ARENA liest nur, entscheidet nichts. (Bis M5 hing die Ziehung am letzten `confirm`; seit der Start-Screen dazwischensteht, hängt sie an dem Übergang, der die Show wirklich startet — wer aus READY abbricht, hat nie gezogen. ADR-40.)
 - `RESULT` schreibt Runde ins Session-Log (localStorage), erhöht Scoreboard.
 - Jeder State hat `enter/exit`-Hooks (Audio, Wake-Lock, Screen-Mount/Unmount).
 - Browser-Back-Button: In PASS/BET/ARENA abgefangen ("Runde abbrechen?"-Dialog), sonst normale Navigation.
@@ -243,6 +247,7 @@ type Beat =
 4. Fake-Locks: 1 (short) / 2 (normal/long). Das **letzte** Fake ist der letzte Beat vor dem Lock und nie das Opfer (maximale Fallhöhe). Frühere Fakes dürfen das Opfer treffen — sonst hängt es systematisch kürzer im Fadenkreuz als alle anderen (ADR-19).
 5. Lock auf Opfer, dann `shot`, dann `death` (bei Leg-/Miss-Deaths enthält die DeathSequence selbst den zweiten Schuss). Der `death`-Beat traegt sein Opfer selbst, damit **Double Tap** mehrere Tode in einem Drehbuch beschreiben kann (ADR-37).
 6. **Double Tap**: Nach dem ersten Tod ein Nachschlag ohne neuen Aufbau — Ruck (500 ms), Lock (900 ms), Schuss, eigene Sequenz. Das Dauer-Preset beschreibt nur den Aufbau bis zum **ersten** Schuss; der Nachschlag zaehlt nicht mit.
+7. **Showdown**: Die Show ist eine **Kette von Segmenten** (`buildSegment`), eines je Schuss, jedes über die zu dem Zeitpunkt noch Lebenden. Auftakt 60 % einer Runde, dann eine Montage mit geometrisch wachsenden Segmenten (×1,45, ohne Scan), am Ende ein Duell mit 90 % und vollem Aufbau. Zwischen zwei Segmenten steht ein `regroup`-Beat: Er nennt die Ueberlebenden **explizit** (der Director darf sie nicht aus dem Shotling-Zustand ableiten — eine Sequenz setzt `dead` erst an ihrem Ende) und ist der einzige Ort, der das Einfrieren nach dem Schuss wieder aufhebt. Opfer, Nicht-Opfer und Verweilzeit-Bilanz werden **pro Segment** gerechnet (ADR-47); global gerechnet wuerde der letzte Fake-Lock jedes Segments den Gewinner verraten. Die Rundendauer ist auf 45 s gedeckelt (ADR-48).
 6. Bei 2 Spielern: min. 4 Aim-Beats in Panic erzwingen.
 
 Der `ShowDirector` spielt das Skript mit einer **GSAP-Timeline** ab (ein Timeline-Objekt, `pause/resume` bei Tab-Wechsel → `visibilitychange`). Slow-Mo läuft **nicht** über die Show-Timeline, sondern über `Camera.timeScale`, das den Zeitschritt von Männchen und Partikeln skaliert — sonst dehnt sich die Lock-Phase und die Dauer-Presets stimmen nicht mehr (ADR-21).

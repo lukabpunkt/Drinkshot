@@ -705,3 +705,129 @@ warf weg, was er prüfen wollte. Und die Modus-Buttons melden sich als `aria-che
 - [ ] **Offline auf dem iPhone.** Seite einmal laden, zum Homescreen hinzufügen, Flugmodus
       an, App öffnen. Unter Chromium ist das getestet; Playwright kann es unter WebKit
       nicht, also muss es einmal ein Mensch am Gerät sehen.
+
+---
+
+## M5b — Showdown & Start-Screen (2026-09-04)
+
+Zwei Wünsche, die nichts miteinander zu tun haben — und beim Bauen kamen fünf Fehler
+heraus, die schon vorher im Spiel steckten.
+
+### Der Start-Screen
+
+Bis jetzt startete die Show in dem Moment, in dem der letzte Spieler „Bestätigen &
+verstecken" tippte. Das Handy lag da noch in seiner Hand; niemand am Tisch sah den Anfang.
+Der Pass-the-Phone-Fluss hatte keinen Übergabepunkt.
+
+Jetzt steht dazwischen ein Zustand `READY`: „Alle haben gesetzt", die Farb-Badges aller
+Mitspieler, **„Legt das Handy in die Mitte"**, Modus- und Dauer-Chip, ein grosser
+Start-Knopf. Keine Einsätze — Audit A1 verlangt, dass ab dem Bestätigen keine Zahl mehr
+sichtbar ist, und dieser Screen ist die neue Stelle, an der man das brechen könnte.
+
+**Die Ziehung wandert mit.** Sie hing am `confirm` des letzten Spielers und hängt jetzt am
+`startShow`. Sie passiert weiterhin genau einmal und ausschliesslich in der FSM (ADR-2) —
+aber an dem Übergang, der die Show wirklich startet. Wer aus READY abbricht, hat nie
+gezogen.
+
+### Der Showdown
+
+Alle setzen wie immer, dann fallen n−1 Schüsse in **einer** Runde, bis einer steht. Jeder
+Getroffene trinkt seinen eigenen Einsatz, der Überlebende verteilt seinen.
+
+Der Unterschied zu „Sudden Death" ist die Reichweite: Dort scheidet man für die **Session**
+aus. Hier gilt das Ausscheiden nur innerhalb der Runde — `eliminatedIds` bleibt leer.
+Stünde da etwas drin, wäre die Session nach genau einer Runde vorbei: `activePlayers()`
+filtert danach, `canStart()` würde false, „Nächste Runde" wäre ausgegraut. Ein E2E-Test
+belegt, dass danach weitergespielt werden kann.
+
+**Die Dramaturgie.** Ein gleichmässiger Nachschlag wie bei Double Tap trägt hier nicht —
+der erste Schuss von sechs ist kein Höhepunkt, der letzte ist einer. Die Show ist deshalb
+eine Kette von Segmenten mit wachsender Länge:
+
+```
+Auftakt   ████████████        60 % einer Runde, voller Scan
+Montage   ███ → ████ → ██████ geometrisch wachsend, ohne Scan
+FINALE    ██████████████████  90 %, Scan + Panik + Fake-Locks
+```
+
+| Spieler | Schüsse | Kurz | Normal | Lang |
+|---|---|---|---|---|
+| 4 | 3 | 20 s | 28 s | 38 s |
+| 6 | 5 | 25 s | 34 s | 37 s |
+| 8 | 7 | 29 s | 35 s | 42 s |
+
+Gedeckelt auf 45 s: Erst wird die Montage gestaucht, dann der Auftakt gekürzt. Das Finale
+nie — es ist der Grund, warum jemand den Modus spielt.
+
+### Die Fairness-Falle, die fast durchgerutscht wäre
+
+Die Regel „der letzte Fake-Lock ist nie das Opfer" berechnet die Nicht-Opfer. Bei n−1
+Opfern ist das **genau eine Person: der Gewinner**. Jeder letzte Fake hätte ihn verraten —
+in jedem Segment, jede Runde. Deshalb werden Opfer, Nicht-Opfer und Verweilzeit-Bilanz
+pro Segment gerechnet. Ein Test misst genau das: Der letzte Fake zeigt in unter 75 % der
+Fälle auf den Überlebenden; global gerechnet wären es exakt 100 %.
+
+Dazu drei weitere Zusicherungen, alle gemessen statt behauptet:
+
+| Zusicherung | Messung |
+|---|---|
+| Gleiche Einsätze ⇒ gleiche Überlebenschance | 1/n ± 1 % über 100 000 Runden |
+| Mehr Einsatz ⇒ seltener überleben | streng fallend über 100 000 Runden |
+| Der Überlebende hängt nicht auffälliger im Fadenkreuz als andere Nicht-Opfer | Abweichung < 1 % über 4 000 Seeds |
+| Die Schusszeiten hängen nicht davon ab, **wen** es trifft | identisch über alle Opfer-Permutationen |
+
+### Die Fehler, die schon vorher drin waren
+
+1. **Der zweite Double-Tap-Lock zielte auf die Leiche.** `ShowDirector` las im `lock`-Beat
+   die Einzahl-Option `victimId` statt `beat.target` — das Fadenkreuz fuhr auf das bereits
+   tote erste Opfer zurück, nachdem der `aim`-Beat davor korrekt auf das zweite geruckt
+   war. Ausgeliefert seit M5. Aufgefallen ist es nur, weil der Director **keinen einzigen
+   Unit-Test** hatte; der neue wurde gegen den alten Code gegengeprüft und wird dort rot.
+
+2. **Vier Abläufe hingen an `animation.finished`** — und Chrome hält Animationen in einem
+   Hintergrund-Tab an. `playState` bleibt „running", `currentTime` bleibt 0, das
+   Versprechen löst nie auf. Betroffen: der Router-Wipe (und weil `go()` serialisiert,
+   blieb danach **jeder** Screenwechsel für den Rest der Session hängen), die
+   „Zahl-im-Tresor"-Animation im Bet-Screen (das `confirm` kam nie, und der Knopf war schon
+   auf `submitted` gesetzt — die Runde liess sich nicht mehr bestätigen), das Schliessen
+   eines Sheets und das Entfernen eines Toasts. Auf dem Handy reicht dafür ein Anruf mitten
+   im Übergang. Gefunden nur, weil der Testbrowser zufällig im Hintergrund lief — kein
+   E2E-Test deckt das ab, Playwright hält seine Seite sichtbar.
+
+3. **`setAimed` hätte Leichen aufgeweckt.** Eine Sequenz setzt `dead` erst an ihrem Ende;
+   bis dahin ist das Opfer nur `isDriven()`. Ohne Guard hätte der nächste Zielwechsel ihm
+   `panic` + `burst` gegeben, während GSAP sein Rig animiert.
+
+4. **`deathTimeline` war ein Einzelfeld** — bei mehreren Toden wartete die Show nur auf den
+   letzten. Und `skipToEnd()` feuerte alle übersprungenen Callbacks synchron nach: Beim
+   Überspringen wären bis zu sieben Todesanimationen gleichzeitig gebaut worden.
+
+5. **Das LOCK-Schild hing an einer Wanduhr** (`setTimeout` auf den ersten Lock) und driftete
+   beim Tab-Wechsel gegen die Show.
+
+Dazu zwei Fehler in meinen eigenen neuen Tests, die etwas Echtes gezeigt haben:
+Montage-Segmente unter 2,2 s erzeugten Beats von **einer Millisekunde** — Tod, Lock und ein
+sichtbarer Wechsel passen darunter nicht. Und die erste Fassung des Überlebenden-Tests
+mass einen Scheineffekt: Der Gewinner ist in jedem Segment dabei, die anderen fallen weg,
+also haben späte Segmente zwangsläufig höhere Anteile. Verglichen wird jetzt innerhalb des
+Segments.
+
+### Zahlen
+
+| | |
+|---|---|
+| Unit-Tests | 421 (vorher 366) |
+| Neue Testdateien | `showDirector` (9), `choreographerCascade` (17), `readyScreen` (11), `choreographerSnapshot` (1) |
+| Referenz-Hash der bestehenden Modi | unverändert über 10 500 Skripte |
+| JS gzip | 251 KB (Budget 450), Einstieg 23 KB, Arena weiterhin lazy |
+| Kontrast | 26 Paare, schlechtestes 4,58:1 |
+
+**Manuelle Checks, die Luka bestätigen muss:**
+- [ ] **Trägt die Kaskade?** Auftakt → Montage → Finale. Oder ist die Mitte zäh?
+      `Einstellungen → Modus → Showdown`, am besten mit 5–6 Personen.
+- [ ] **Die Länge.** 6 Spieler auf „Normal" sind 34 s. Am Tisch in Ordnung, oder soll
+      „Kurz" der Standard für diesen Modus werden?
+- [ ] **Der Start-Screen.** Reicht „Legt das Handy in die Mitte", oder braucht es mehr?
+- [ ] **Die Balance.** Du hast die Zahlen gesehen und dich für Konsistenz entschieden.
+      Wenn im Playtest alle nur noch 1 setzen, steht die Pot-Variante in ADR-51 und ist
+      eine kleine Änderung.

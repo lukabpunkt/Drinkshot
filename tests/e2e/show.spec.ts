@@ -256,3 +256,68 @@ test('Double Tap: zwei Opfer, zwei Schüsse, beide trinken (Audit A5)', async ({
   );
   expect(rounds[rounds.length - 1]?.drinkers).toHaveLength(2);
 });
+
+test('Showdown: alle bis auf einen fallen, niemand scheidet dauerhaft aus', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  // Kurzes Preset: Bei vier Spielern fallen drei Schüsse, das dauert ohnehin.
+  await enterArena(page, '?dev=1', PLAYERS, { sound: false, mode: 'showdown', duration: 'short' });
+
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 120_000 });
+
+  /*
+   * Genau einer überlebt: Die Kopfzeile feiert ihn, die Unterzeile sagt, was die anderen
+   * trinken (GDD §3.6).
+   */
+  await expect(page.locator('.result__headline')).toContainText('überlebt');
+  await expect(page.locator('.result__crown')).toBeVisible();
+  await expect(page.locator('.result__zone')).toContainText('Schüsse');
+
+  const round = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          drinkshot: {
+            session: {
+              state: {
+                rounds: {
+                  drinkers: unknown[];
+                  eliminatedIds: string[];
+                  winnerId?: string;
+                }[];
+              };
+            };
+          };
+        }
+      ).drinkshot.session.state.rounds.at(-1)!
+  );
+
+  // Vier Spieler, drei trinken, einer gewinnt.
+  expect(round.drinkers).toHaveLength(PLAYERS - 1);
+  expect(round.winnerId).toBeTruthy();
+  /*
+   * Der Unterschied zu Sudden Death: Das Ausscheiden gilt nur innerhalb der Runde. Wäre
+   * `eliminatedIds` gefüllt, wäre die Session nach dieser einen Runde vorbei.
+   */
+  expect(round.eliminatedIds).toEqual([]);
+
+  // Und der Beleg dafür: Die nächste Runde lässt sich starten.
+  const next = page.getByRole('button', { name: 'Nächste Runde' });
+  await expect(next).toBeEnabled();
+  await next.click();
+  await expect(page.locator('.screen--pass')).toBeVisible({ timeout: 20_000 });
+});
+
+test('Showdown markiert niemanden in der Lobby als ausgeschieden', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  await enterArena(page, '?dev=1', 3, { sound: false, mode: 'showdown', duration: 'short' });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 120_000 });
+
+  await page.getByRole('button', { name: 'Spieler ändern' }).click();
+  await page.locator('.screen--lobby').waitFor({ timeout: 20_000 });
+
+  // Zwei von drei sind erschossen worden — trotzdem ist niemand markiert.
+  await expect(page.locator('.lobby__row.is-eliminated')).toHaveCount(0);
+  await expect(page.locator('.lobby__row')).toHaveCount(3);
+});

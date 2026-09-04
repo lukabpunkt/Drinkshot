@@ -126,7 +126,8 @@ Gesamt-Checks:
 | `prefers-reduced-motion` respektiert (Wipes→Fade, kein Shake)                                   | MUSS |
 | Tastatur-Navigation Titel→Lobby→Settings vollständig (Desktop)                                  | SOLL |
 | EN vollständig; kein Fallback-Key sichtbar (`[missing]`-Grep)                                   | MUSS |
-| Alle 4 Modi im UI erklärt und spielbar; Sudden-Death-Ausscheiden sichtbar                       | MUSS |
+| Alle 5 Modi im UI erklärt und spielbar; Sudden-Death-Ausscheiden sichtbar                       | MUSS |
+| Start-Screen erscheint in jedem Modus und zeigt **keinen** Einsatz                              | MUSS |
 | Titel-Loop läuft ohne Speicherleck (10 min Idle, Heap flach)                                    | MUSS |
 | Haptik-Muster auf Android spürbar, auf iOS still fehlschlagend (kein Error)                     | SOLL |
 | Fehlerfälle: Offline-Start nach Erstinstallation, Atlas-Fehler → Toast                          | MUSS |

@@ -64,15 +64,16 @@ test('Sprachwechsel schaltet vollstaendig um und bleibt gesetzt', async ({ page 
   await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
 });
 
-test('alle vier Modi sind erklaert und auswaehlbar (Audit A5)', async ({ page }) => {
+test('alle fuenf Modi sind erklaert und auswaehlbar (Audit A5)', async ({ page }) => {
   await openTitle(page);
   await page.getByRole('button', { name: 'Einstellungen' }).click();
   await page.locator('.modes').waitFor();
 
   const options = page.locator('.modes__option');
-  await expect(options).toHaveCount(4);
+  const MODES = 5;
+  await expect(options).toHaveCount(MODES);
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < MODES; i++) {
     const option = options.nth(i);
     // Jeder Modus hat einen Namen *und* einen Satz, der ihn erklaert.
     await expect(option.locator('.modes__name')).not.toBeEmpty();
@@ -81,8 +82,8 @@ test('alle vier Modi sind erklaert und auswaehlbar (Audit A5)', async ({ page })
   }
 
   // Die Modi sind eine Radiogruppe — der gewaehlte meldet sich als `aria-checked`.
-  await options.nth(3).click();
-  await expect(options.nth(3)).toHaveAttribute('aria-checked', 'true');
+  await options.nth(MODES - 1).click();
+  await expect(options.nth(MODES - 1)).toHaveAttribute('aria-checked', 'true');
   await expect(options.nth(0)).toHaveAttribute('aria-checked', 'false');
 });
 

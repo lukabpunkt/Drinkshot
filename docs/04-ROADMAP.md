@@ -154,6 +154,24 @@ Schritte:
 
 ---
 
+## M5b — Showdown & Start-Screen (Tag `v0.6.0`)
+
+**Ziel:** Ein Modus, der eine Runde zum Abend macht — und ein Handy, das aufhört zu wandern, bevor die Show anfängt.
+
+Schritte:
+
+1. **Start-Screen** (`READY`) zwischen letztem Einsatz und Arena, in **jedem** Modus. Die Ziehung wandert vom letzten `confirm` auf `startShow` (ADR-40).
+2. **Showdown**: `MODE_SPECS.victims` kann `'allButOne'`; `resolveRound` lässt n−1 trinken und macht den Übriggebliebenen zum Gewinner. `eliminatedIds` bleibt **leer** — sonst wäre die Session nach einer Runde vorbei.
+3. **Kaskade** in der Choreografie: eine Kette von Segmenten mit eskalierendem Aufbau (ADR-46), Fairness pro Segment (ADR-47), Dauer gedeckelt (ADR-48).
+4. **Regie**: `regroup`-Beat taut die Überlebenden zwischen zwei Schüssen wieder auf; `settle` unterdrückt die Schlussgeste bei Zwischentoden.
+5. **Result-Screen**: Im Showdown steht der Überlebende im Mittelpunkt (ADR-50).
+
+**Unterwegs behoben** (Fehler, die schon im ausgelieferten Stand steckten): der zweite Double-Tap-Lock zielte auf das tote erste Opfer (ADR-44) · vier Abläufe hingen an `animation.finished` und froren in einem Hintergrund-Tab dauerhaft ein (ADR-49).
+
+**Definition of Done:** Alle fünf Modi spielbar und erklärt · Showdown end-to-end belegt · Fairness der Ziehung und der Show gemessen · Referenz-Hash der bestehenden Modi unverändert · CI grün.
+
+---
+
 ## M6 — Playtest, Fairness-Beweis & Release 1.0 (Tag `v1.0.0`)
 
 **Ziel:** Echt getestet, öffentlich, installierbar.

@@ -137,6 +137,10 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 | **Verteiler**         | Opfer wird angeschossen; **alle anderen** trinken den Einsatz des Opfers (das Opfer "verteilt" posthum).                            | Belohnt Mut: hoher Einsatz = hohes Risiko, aber die anderen zahlen. Näher am Ursprungs-Pitch. |
 | **Sudden Death**      | Wie Klassik, aber der Getroffene scheidet für die Session aus; letzter Überlebender bekommt die Summe aller Einsätze zum Verteilen. | Turnier-Feeling für 5+ Spieler.                                                               |
 | **Double Tap**        | Wie Klassik, aber es fallen 2 Schüsse (2 Opfer, ohne Zurücklegen).                                                                  | Für große Gruppen (6–8).                                                                      |
+| **Showdown**          | Es wird geschossen, bis nur einer steht. Jeder Getroffene trinkt seinen eigenen Einsatz, der Überlebende verteilt seinen. **Kein Ausscheiden für die Session** — nächste Runde sind alle wieder dabei. Wunder sind hier aus, weil genau einer überleben muss. | Der große Auftritt: eine Runde als ganzer Abend im Kleinen. |
+
+**Zur Balance im Showdown** (gemessen, 300 000 simulierte Runden, 6 Spieler): Weil jeder der n−1 Schüsse nach Einsatz gewichtet wird, multipliziert sich das Risiko. Wer 1 setzt, überlebt in 52,9 % der Runden und trinkt im Schnitt 0,76; wer 6 setzt, überlebt in 2,6 % und trinkt 6,20. Ein hoher Einsatz ist hier auf **beiden** Achsen schlechter. Das ist bewusst so: Konsistenz mit den anderen Modi und eine Regel, die man am Tisch in einem Satz sagt, schlagen die rechnerische Balance — und dass der Großmauligste als Erster umfällt, ist gute Comedy. Sollte sich im Playtest zeigen, dass alle nur noch 1 setzen, liegt die Alternative in `DECISIONS.md` (ADR-51).
+
 
 ### 3.7 Result-Screen
 
@@ -144,6 +148,7 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 - Darunter aufklappbar: "Alle Einsätze" — jetzt sind alle Einsätze öffentlich (Tabelle Farbe · Name · Einsatz · Chance %). **Das ist der zweite Comedy-Moment:** "Du hast 1 gesetzt und wurdest trotzdem getroffen?!"
 - Session-Scoreboard: Balken pro Spieler "insgesamt getrunken".
 - Buttons: **"Nächste Runde"** (gleiche Spieler, direkt in Betting) · "Spieler ändern" · "Modus ändern".
+- Im **Showdown** steht nicht das Opfer im Mittelpunkt, sondern der Überlebende: sein Badge, seine Farbe, "Überlebt"-Abzeichen in Gold, Kopfzeile "{Name} überlebt!", darüber "{n} Schüsse. Einer steht noch." In der Einsatz-Tabelle ist er hervorgehoben statt des Opfers.
 
 ---
 
@@ -229,7 +234,8 @@ Ziel: mindestens **12 unterschiedliche Tode** bis Release, damit selbst nach 20 
 | 1   | **Lobby**        | Spielerliste (Farb-Badge, Name editierbar, X zum Entfernen), "+ Spieler" (bis 8), Modus-Chip, Dauer-Chip. Primary CTA: **Los geht's**. Namen werden in localStorage gemerkt.                                |
 | 2   | **Pass-Screen**  | Vollbild in Spielerfarbe, große Anweisung "Handy an **Name** geben", Tap-to-continue. Blockiert 800 ms gegen Doppeltaps.                                                                                    |
 | 3   | **Bet-Screen**   | Zahl riesig, +/– Buttons (Touch-Ziel ≥ 64 px), Hinweistext "Mehr Einsatz = höheres Risiko", Button **Bestätigen**. Nach Bestätigen: kurze Bestätigungs-Animation (Zahl verschwindet in Umschlag/Tresor).    |
-| 4   | **Arena**        | Scope-View (siehe 3.5). **Keine** Interaktion nötig. Optional: "Tap zum Überspringen" erst nach dem Schuss (springt zur Result).                                                                            |
+| 3b  | **Start-Screen** | Nachdem der letzte Spieler bestätigt hat: "Alle haben gesetzt", die Farb-Badges aller Mitspieler, **"Legt das Handy in die Mitte"**, Modus- und Dauer-Chip, Primary-CTA **Los!**. Zeigt **keine** Einsätze. Der Knopf ist 400 ms taub — er sitzt dort, wo eben noch "Bestätigen" war. |
+| 4   | **Arena**        | Scope-View (siehe 3.5). **Keine** Interaktion nötig. Optional: "Tap zum Überspringen" erst nach dem **letzten** Schuss (springt zur Result).                                                                |
 | 5   | **Result**       | Siehe 3.7. Konfetti in Opferfarbe. Haptik (`navigator.vibrate`) beim Reveal, wenn verfügbar.                                                                                                                |
 | 6   | **Settings**     | Sound an/aus, Musik-Lautstärke, Haptik, Dauer, Modus, Miracles an/aus, Reduzierte Effekte (Low-End-Geräte), Sprache (DE/EN), "Session zurücksetzen".                                                        |
 | 7   | **Regeln**       | 4 Cards mit Illustration, Swipe. Max. 30 Wörter pro Card.                                                                                                                                                   |

@@ -29,6 +29,16 @@ async function freshStart(page: Page): Promise<void> {
     window.localStorage.clear();
     // 18+-Hinweis vorab quittieren, sonst deckt das Sheet den Titel-Screen ab.
     window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
+    /*
+     * Wunder aus. Sie kommen in 1 von 40 Runden — über zwei Runden pro Lauf trifft das
+     * etwa jeden zwanzigsten Testlauf, und dann trinkt niemand und die Zusicherung
+     * „{name} trinkt 4" bricht. Der Flow-Test prüft den Ablauf, nicht die Seltenheit;
+     * die hat ihren eigenen Test in `show.spec.ts`.
+     */
+    window.localStorage.setItem(
+      'drinkshot.session.v1',
+      JSON.stringify({ players: [], rounds: [], settings: { miracles: false } })
+    );
   });
   await page.goto('./');
 }

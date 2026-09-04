@@ -45,6 +45,13 @@ export interface DeathContext {
   audio: DeathAudio;
   rng: SeededRng;
   arena: Arena;
+  /**
+   * Ist dieser Tod das Ende der Runde? Im Showdown folgen weitere Schuesse — dann fehlt
+   * die Schlussgeste (alle halten an, einer klatscht, Kamera-Nachbeben), damit die
+   * Ueberlebenden weiterlaufen und sich die Runde nicht wie sechs Enden anfuehlt.
+   * Default `true`.
+   */
+  settle?: boolean;
 }
 
 /** Eine Sequenz ist ihre Katalog-Beschreibung plus die Animation dazu. */

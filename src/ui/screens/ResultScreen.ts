@@ -70,9 +70,16 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
     return { el };
   }
 
-  const victim = ctx.session.playerById(round.victimId);
-  const victimColor = victim ? colorById(victim.colorId) : colorById('red');
   const isMiracle = round.zone === 'miracle';
+  const isShowdown = round.mode === 'showdown';
+
+  /*
+   * Wer steht im Mittelpunkt? Normalerweise das Opfer — im Showdown der **Überlebende**.
+   * Dort sind fast alle Opfer; die Geschichte ist, wer noch steht.
+   */
+  const heroId = isShowdown ? (round.winnerId ?? round.victimId) : round.victimId;
+  const victim = ctx.session.playerById(heroId);
+  const victimColor = victim ? colorById(victim.colorId) : colorById('red');
 
   /*
    * Beim Wunder wird nicht in der Farbe des Opfers gefeiert, sondern in Gold: Es ist der
@@ -105,15 +112,32 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   const zone = document.createElement('p');
   zone.className = 'result__zone';
-  zone.innerHTML = zoneIcon(round.zone);
-  const zoneText = document.createElement('span');
-  zoneText.textContent = t(`result.zone.${round.zone}`);
-  zone.append(zoneText);
+  const shots = 1 + round.extraVictimIds.length;
+  if (isShowdown) {
+    /*
+     * Eine einzelne Trefferzone sagt bei fünf Schüssen nichts — die Zahl der Schüsse
+     * schon.
+     */
+    zone.innerHTML = zoneIcon('miss');
+    const zoneText = document.createElement('span');
+    zoneText.textContent = t('result.showdownShots', { count: shots });
+    zone.append(zoneText);
+  } else {
+    zone.innerHTML = zoneIcon(round.zone);
+    const zoneText = document.createElement('span');
+    zoneText.textContent = t(`result.zone.${round.zone}`);
+    zone.append(zoneText);
+  }
 
   if (isMiracle) {
     const badge = document.createElement('p');
     badge.className = 'result__legend';
     badge.textContent = t('result.miracleBadge');
+    reveal.append(badge);
+  } else if (isShowdown && round.winnerId !== undefined) {
+    const badge = document.createElement('p');
+    badge.className = 'result__legend result__crown';
+    badge.textContent = t('result.survivorBadge');
     reveal.append(badge);
   }
 
@@ -220,6 +244,11 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 function headlineText(round: RoundResult, ctx: ScreenContext): string {
   if (round.zone === 'miracle') return t('result.miracle');
 
+  if (round.mode === 'showdown' && round.winnerId !== undefined) {
+    const winner = ctx.session.playerById(round.winnerId);
+    return t('result.survives', { name: winner?.name ?? '' });
+  }
+
   const victim = ctx.session.playerById(round.victimId);
   const name = victim?.name ?? '';
 
@@ -248,6 +277,15 @@ function subText(round: RoundResult, ctx: ScreenContext): string {
         return t('result.drinks', { name, sips: plural('common.sipsCount', drinker.sips) });
       })
       .join(' ');
+  }
+
+  if (round.mode === 'showdown') {
+    if (round.winnerId === undefined) return '';
+    const winner = ctx.session.playerById(round.winnerId);
+    return t('result.showdownSub', {
+      name: winner?.name ?? '',
+      sips: plural('common.sipsCount', round.sipsToDistribute ?? 0),
+    });
   }
 
   if (round.mode === 'suddenDeath') {
@@ -290,7 +328,15 @@ function createBetsTable(
   for (const bet of sorted) {
     const player = ctx.session.playerById(bet.playerId);
     const row = document.createElement('tr');
-    if (bet.playerId === round.victimId) row.classList.add('is-victim');
+    /*
+     * Normalerweise hebt die Tabelle das Opfer hervor. Im Showdown sind fast alle Opfer —
+     * hervorgehoben wird deshalb der Überlebende.
+     */
+    if (round.mode === 'showdown') {
+      if (bet.playerId === round.winnerId) row.classList.add('is-winner');
+    } else if (bet.playerId === round.victimId) {
+      row.classList.add('is-victim');
+    }
 
     const nameCell = document.createElement('td');
     nameCell.className = 'bets__name';

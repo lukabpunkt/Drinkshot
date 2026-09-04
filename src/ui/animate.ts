@@ -87,27 +87,57 @@ export function growBar(el: HTMLElement, percent: number, delayMs = 0): void {
   setTimeout(() => el.style.setProperty('--score-fill', target), Math.max(delayMs, 16));
 }
 
+/** Sicherheitsabstand auf die Nennlaufzeit, bevor der Notausgang greift. */
+const ANIMATION_TIMEOUT_MARGIN_MS = 400;
+
+export interface SafeAnimateOptions {
+  /**
+   * Bei „Bewegung reduzieren" sofort auflösen, ohne zu animieren. Default `true`.
+   * Wer selbst eine ruhige Variante anbietet (der Router macht aus dem Wipe einen Fade),
+   * setzt das auf `false`.
+   */
+  respectReducedMotion?: boolean;
+}
+
 /**
- * `Element.animate`, aber ohne Absturz, wenn es die Web Animations API nicht gibt.
+ * `Element.animate`, aber das Versprechen löst **immer** auf.
  *
- * In jedem Zielbrowser gibt es sie — aber nicht in jsdom, und nicht in sehr alten
- * WebViews. Eine fehlende Schmuck-Animation darf keinen Ablauf abbrechen, und genau das
- * passiert, wenn irgendwo `await el.animate(...).finished` steht.
+ * Zwei Fälle, in denen `await el.animate(...).finished` sonst den Ablauf dahinter
+ * anhält — und beide sind keine Randfälle:
  *
- * Fehlt sie, ist der Effekt sofort fertig: Das Versprechen löst direkt auf, der Aufrufer
- * macht weiter, und das Ergebnis sieht aus wie bei „Bewegung reduzieren".
+ * 1. **Die API fehlt.** In jedem Zielbrowser gibt es sie, aber nicht in jsdom und nicht
+ *    in sehr alten WebViews.
+ * 2. **Der Tab ist im Hintergrund.** Chrome hält Animationen dann an: `playState` bleibt
+ *    „running", `currentTime` bleibt bei 0, und `finished` löst nie auf. Wer während
+ *    eines Screenwechsels aufs Handy angerufen wird, käme sonst zurück auf einen Screen,
+ *    der sich nie wieder wechseln lässt.
+ *
+ * Deshalb ein Wettlauf gegen die Nennlaufzeit plus Reserve. Der Effekt läuft weiter, wenn
+ * er kann — der Ablauf wartet nur nicht mehr auf ihn.
  */
 export function safeAnimate(
   el: Element,
   keyframes: Keyframe[],
-  options: KeyframeAnimationOptions
+  options: KeyframeAnimationOptions,
+  safeOptions: SafeAnimateOptions = {}
 ): Promise<void> {
-  if (prefersReducedMotion() || typeof el.animate !== 'function') return Promise.resolve();
+  const respectReduced = safeOptions.respectReducedMotion ?? true;
+  if ((respectReduced && prefersReducedMotion()) || typeof el.animate !== 'function') {
+    return Promise.resolve();
+  }
+
   try {
-    return el.animate(keyframes, options).finished.then(
-      () => undefined,
-      () => undefined
-    );
+    const animation = el.animate(keyframes, options);
+    const budget =
+      Number(options.duration ?? 0) + Number(options.delay ?? 0) + ANIMATION_TIMEOUT_MARGIN_MS;
+
+    return Promise.race([
+      animation.finished.then(
+        () => undefined,
+        () => undefined
+      ),
+      new Promise<void>((resolve) => globalThis.setTimeout(resolve, budget)),
+    ]);
   } catch {
     return Promise.resolve();
   }

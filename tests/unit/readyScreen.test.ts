@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { READY_ARM_MS } from '@/config/rules';
 import { createFsm, type Fsm } from '@/core/fsm';
 import { createSessionStore, type SessionStore } from '@/core/session';
+import { safeAnimate } from '@/ui/animate';
 import { createReadyScreen } from '@/ui/screens/ReadyScreen';
 import type { ScreenContext } from '@/ui/router';
 
@@ -142,5 +143,72 @@ describe('ReadyScreen', () => {
     screen.destroy?.();
     expect(vi.getTimerCount()).toBe(before);
     vi.useRealTimers();
+  });
+});
+
+describe('safeAnimate', () => {
+  it('löst auch dann auf, wenn die Animation nie fertig wird', async () => {
+    /*
+     * Der Fall aus der Praxis: Chrome hält Animationen in einem Hintergrund-Tab an —
+     * `playState` bleibt „running", `finished` löst nie auf. Weil der Router seine
+     * Navigation serialisiert, blieb der Screenwechsel danach für immer hängen.
+     */
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'animate', {
+      value: () => ({ finished: new Promise(() => undefined) }),
+      configurable: true,
+    });
+
+    const started = Date.now();
+    await safeAnimate(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 50 });
+    // Nennlaufzeit plus Reserve — nicht mehr.
+    expect(Date.now() - started).toBeLessThan(1500);
+  });
+
+  it('wartet normalerweise auf die Animation', async () => {
+    const el = document.createElement('div');
+    let resolved = false;
+    Object.defineProperty(el, 'animate', {
+      value: () => ({
+        finished: new Promise((resolve) =>
+          globalThis.setTimeout(() => {
+            resolved = true;
+            resolve(undefined);
+          }, 20)
+        ),
+      }),
+      configurable: true,
+    });
+
+    await safeAnimate(el, [{ opacity: 0 }], { duration: 20 });
+    expect(resolved).toBe(true);
+  });
+
+  it('überspringt bei „Bewegung reduzieren" — ausser man sagt ausdrücklich nein', async () => {
+    const el = document.createElement('div');
+    let calls = 0;
+    Object.defineProperty(el, 'animate', {
+      value: () => {
+        calls += 1;
+        return { finished: Promise.resolve() };
+      },
+      configurable: true,
+    });
+
+    const media = globalThis.matchMedia;
+    Object.defineProperty(globalThis, 'matchMedia', {
+      value: () => ({ matches: true }),
+      configurable: true,
+    });
+    try {
+      await safeAnimate(el, [{ opacity: 0 }], { duration: 10 });
+      expect(calls).toBe(0);
+
+      // Der Router bietet selbst eine ruhige Variante an und will trotzdem animieren.
+      await safeAnimate(el, [{ opacity: 0 }], { duration: 10 }, { respectReducedMotion: false });
+      expect(calls).toBe(1);
+    } finally {
+      Object.defineProperty(globalThis, 'matchMedia', { value: media, configurable: true });
+    }
   });
 });

@@ -379,16 +379,29 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       return;
     }
 
+    /*
+     * Zwei Dramaturgien, zwei Felder: Double Tap hängt einen kurzen Nachschlag an, der
+     * Showdown baut für jedes weitere Opfer neu auf. `exactOptionalPropertyTypes` erlaubt
+     * kein `undefined`, deshalb wird das Feld nur gesetzt, wenn es Opfer gibt.
+     */
+    const victimList = round.extraVictimIds.map((victimId, index) => ({
+      victimId,
+      deathId: round.extraDeaths[index]?.deathId ?? round.deathId,
+    }));
+    const followUps =
+      victimList.length === 0
+        ? {}
+        : round.mode === 'showdown'
+          ? { cascade: victimList }
+          : { extraVictims: victimList };
+
     const script = buildShowScript({
       players: playerIds,
       victimId: round.victimId,
       seed: round.seed,
       durationPreset: round.durationPreset,
       deathId: round.deathId,
-      extraVictims: round.extraVictimIds.map((victimId, index) => ({
-        victimId,
-        deathId: round.extraDeaths[index]?.deathId ?? round.deathId,
-      })),
+      ...followUps,
     });
 
     director = new ShowDirector({

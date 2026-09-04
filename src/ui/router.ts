@@ -51,7 +51,7 @@ export interface RouterOptions {
   context: Omit<ScreenContext, 'router'>;
 }
 
-import { prefersReducedMotion } from '@/ui/animate';
+import { prefersReducedMotion, safeAnimate } from '@/ui/animate';
 
 /**
  * Setzt den Fokus auf den frisch gemounteten Screen (Audit A5).
@@ -134,13 +134,24 @@ export function createRouter(options: RouterOptions): Router {
         ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-115%,0,0)' }]
         : [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(115%,0,0)' }];
 
-    await overlay.animate(enter, { duration: half, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' })
-      .finished;
+    /*
+     * `safeAnimate` statt `animation.finished`: Im Hintergrund-Tab hält Chrome
+     * Animationen an, das Versprechen löst nie auf — und weil `go()` serialisiert,
+     * bliebe der Screenwechsel für den Rest der Session hängen.
+     *
+     * `respectReducedMotion: false`, weil der Wipe hier oben schon zum Fade geworden ist.
+     */
+    const wipeOptions: KeyframeAnimationOptions = {
+      duration: half,
+      easing: 'cubic-bezier(.65,0,.35,1)',
+      fill: 'forwards',
+    };
+
+    await safeAnimate(overlay, enter, wipeOptions, { respectReducedMotion: false });
 
     mount(id);
 
-    await overlay.animate(leave, { duration: half, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' })
-      .finished;
+    await safeAnimate(overlay, leave, wipeOptions, { respectReducedMotion: false });
 
     overlay.remove();
     instance?.activate?.();

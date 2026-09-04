@@ -104,7 +104,12 @@ function makeShotling(index: number): Record<string, unknown> {
   };
 }
 
-function makeDirector(options: { players: PlayerId[]; victimId: PlayerId; extra?: PlayerId[] }) {
+function makeDirector(options: {
+  players: PlayerId[];
+  victimId: PlayerId;
+  extra?: PlayerId[];
+  cascade?: PlayerId[];
+}) {
   const log: AimLog = { targets: [], locks: 0, releases: 0 };
   const shotlings = new Map<PlayerId, unknown>();
   options.players.forEach((id, index) => shotlings.set(id, makeShotling(index + 1)));
@@ -117,6 +122,9 @@ function makeDirector(options: { players: PlayerId[]; victimId: PlayerId; extra?
     deathId: 'basic_fall',
     ...(options.extra
       ? { extraVictims: options.extra.map((victimId) => ({ victimId, deathId: 'basic_fall' })) }
+      : {}),
+    ...(options.cascade
+      ? { cascade: options.cascade.map((victimId) => ({ victimId, deathId: 'basic_fall' })) }
       : {}),
   });
 
@@ -269,3 +277,72 @@ function seekTo(director: ShowDirector, ms: number): void {
   const timeline = (director as unknown as { timeline: gsap.core.Timeline }).timeline;
   timeline.time(ms / 1000);
 }
+
+describe('ShowDirector — Kaskade', () => {
+  it('taut die Überlebenden nach jedem Tod wieder auf', () => {
+    const { director, script, shotlings } = makeDirector({
+      players: ['p1', 'p2', 'p3', 'p4'],
+      victimId: 'p1',
+      cascade: ['p2', 'p3'],
+    });
+
+    const regroups = script.beats.filter((beat) => beat.type === 'regroup');
+    expect(regroups).toHaveLength(2);
+
+    director.play();
+    // Bis kurz hinter das erste Sammeln spulen.
+    seekTo(director, regroups[0]!.t + 10);
+
+    /*
+     * Der `shot`-Beat friert alles ein (`setPhaseSpeed(0)`). Ohne `regroup` stünde die
+     * Arena danach still, und die restlichen Schüsse träfen Statuen.
+     */
+    const survivor = shotlings.get('p4') as {
+      brain: { speedMultiplier: number };
+      getState: () => string;
+    };
+    expect(survivor.brain.speedMultiplier).toBeGreaterThan(0);
+    expect(survivor.getState()).toBe('panic');
+    director.destroy();
+  });
+
+  it('lässt ein Männchen in Ruhe, dessen Sequenz noch läuft', () => {
+    const { director, script, shotlings } = makeDirector({
+      players: ['p1', 'p2', 'p3', 'p4'],
+      victimId: 'p1',
+      cascade: ['p2', 'p3'],
+    });
+
+    const victim = shotlings.get('p1') as {
+      setDriven: (value: boolean) => void;
+      setState: (next: string) => void;
+      getState: () => string;
+    };
+    victim.setState('aimed');
+    victim.setDriven(true);
+
+    director.play();
+    const regroup = script.beats.find((beat) => beat.type === 'regroup')!;
+    seekTo(director, regroup.t + 10);
+
+    // Das Sammeln darf die laufende Todesanimation nicht überschreiben.
+    expect(victim.getState()).not.toBe('panic');
+    director.destroy();
+  });
+
+  it('meldet nur den letzten von fünf Schüssen als final', () => {
+    const { director, script, shots } = makeDirector({
+      players: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+      victimId: 'p1',
+      cascade: ['p2', 'p3', 'p4', 'p5'],
+    });
+
+    director.play();
+    seekTo(director, script.totalMs);
+
+    expect(shots).toHaveLength(5);
+    expect(shots.filter((info) => info.final)).toHaveLength(1);
+    expect(shots.at(-1)?.final).toBe(true);
+    director.destroy();
+  });
+});

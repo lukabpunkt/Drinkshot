@@ -9,7 +9,7 @@
 import { COACHMARK_MS, DEFAULT_BET } from '@/config/rules';
 import { colorById, hex, MOTION } from '@/config/theme';
 import { t } from '@/core/i18n';
-import { prefersReducedMotion } from '@/ui/animate';
+import { safeAnimate } from '@/ui/animate';
 import { createButton } from '@/ui/components/button';
 import { createCoachmark } from '@/ui/components/coachmark';
 import { createBetStepper } from '@/ui/components/stepper';
@@ -60,17 +60,25 @@ export function createBetScreen(ctx: ScreenContext): ScreenInstance {
     confirm.disabled = true;
     vibrate('confirm');
 
-    // "Die Zahl verschwindet im Tresor": schrumpft und faellt nach unten weg.
+    /*
+     * "Die Zahl verschwindet im Tresor": schrumpft und faellt nach unten weg.
+     *
+     * `safeAnimate`, nicht `.finished`: Im Hintergrund-Tab haelt Chrome Animationen an,
+     * das Versprechen loeste nie auf — und weil `submitted` schon gesetzt ist, waere der
+     * Knopf danach tot und die Runde nicht mehr zu bestaetigen. Wer waehrend des Tippens
+     * angerufen wird, saesse fest.
+     */
     const value = stepper.el.querySelector<HTMLElement>('.stepper__value');
-    if (value && !prefersReducedMotion()) {
-      await value.animate(
+    if (value) {
+      await safeAnimate(
+        value,
         [
           { transform: 'scale(1)', opacity: 1 },
           { transform: 'scale(1.18)', opacity: 1, offset: 0.35 },
           { transform: 'scale(0.1) translateY(90px)', opacity: 0 },
         ],
         { duration: MOTION.base, easing: 'cubic-bezier(.5,-0.3,.7,1)', fill: 'forwards' }
-      ).finished;
+      );
     }
 
     coach.dismiss();

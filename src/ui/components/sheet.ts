@@ -7,6 +7,7 @@
  */
 
 import { t } from '@/core/i18n';
+import { safeAnimate } from '@/ui/animate';
 
 export interface SheetOptions {
   title: string;
@@ -74,17 +75,21 @@ export function openSheet(options: SheetOptions): SheetHandle {
     if (closed) return;
     closed = true;
     document.removeEventListener('keydown', onKeyDown, true);
-    panel
-      .animate([{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }], {
-        duration: 180,
-        easing: 'cubic-bezier(.4,0,1,1)',
-        fill: 'forwards',
-      })
-      .finished.finally(() => {
-        root.remove();
-        previousFocus?.focus?.();
-        options.onClose?.();
-      });
+    /*
+     * `safeAnimate` statt `.finished`: Im Hintergrund-Tab hält Chrome Animationen an und
+     * das Versprechen löst nie auf — das Sheet bliebe für immer offen, der Fokus käme nie
+     * zurück und `onClose` liefe nicht.
+     */
+    void safeAnimate(
+      panel,
+      [{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }],
+      { duration: 180, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' },
+      { respectReducedMotion: false }
+    ).then(() => {
+      root.remove();
+      previousFocus?.focus?.();
+      options.onClose?.();
+    });
     backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
   };
 

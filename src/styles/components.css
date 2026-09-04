@@ -1790,3 +1790,17 @@
     transition: none;
   }
 }
+
+/*
+ * Showdown: Hervorgehoben wird der Überlebende, nicht das Opfer — dort sind fast alle
+ * Opfer. Gold statt Spielerfarbe, weil es ein Gewinn ist.
+ */
+.bets tr.is-winner td {
+  color: var(--c-accent);
+  font-weight: 800;
+}
+
+.result__crown {
+  background: var(--c-accent);
+  color: var(--c-ink);
+}

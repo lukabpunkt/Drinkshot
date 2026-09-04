@@ -86,6 +86,10 @@
     "miracleBadge": "Legende",
     "eliminated": "{name} ist raus.",
     "winner": "{name} hat überlebt und verteilt {sips}.",
+    "survives": "{name} überlebt!",
+    "showdownShots": "{count} Schüsse. Einer steht noch.",
+    "showdownSub": "Alle anderen trinken ihren Einsatz. {name} verteilt {sips}.",
+    "survivorBadge": "Überlebt",
     "needMorePlayers": "Nur noch eine Person übrig. Ändere die Spieler für eine neue Session.",
     "allBets": "Alle Einsätze",
     "tableName": "Name",
@@ -132,6 +136,8 @@
     "suddenDeathHint": "Wer getroffen wird, ist raus. Der Letzte verteilt.",
     "doubleTap": "Double Tap",
     "doubleTapHint": "Zwei Schüsse, zwei Opfer.",
+    "showdown": "Showdown",
+    "showdownHint": "Es wird geschossen, bis nur einer übrig ist.",
     "recommended": "Ab {count} Personen"
   },
   "rules": {

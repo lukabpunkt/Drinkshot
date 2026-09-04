@@ -11,7 +11,7 @@
  */
 
 import gsap from 'gsap';
-import { CHOREO, HEARTBEAT } from '@/config/choreo';
+import { CASCADE, CHOREO, HEARTBEAT } from '@/config/choreo';
 import { ARENA } from '@/config/theme';
 import type { ShowScript } from '@/core/choreographer';
 import type { PlayerId } from '@/core/lottery';
@@ -141,6 +141,10 @@ export class ShowDirector {
      */
     const shotCount = script.beats.filter((beat) => beat.type === 'shot').length;
     let shotIndex = 0;
+    const deathCount = script.beats.filter((beat) => beat.type === 'death').length;
+    let deathIndex = 0;
+    /** Zaehlt die Sammel-Pausen — jede macht die Ueberlebenden ein Stueck hektischer. */
+    let regroupIndex = 0;
     const timeline = this.timeline;
 
     for (const beat of script.beats) {
@@ -263,6 +267,8 @@ export class ShowDirector {
         case 'death': {
           const deathId = beat.deathId;
           const deathVictimId = beat.victim;
+          deathIndex += 1;
+          const isFinalDeath = deathIndex === deathCount;
           timeline.call(
             () => {
               const victim = this.shotlingOf(deathVictimId);
@@ -283,6 +289,9 @@ export class ShowDirector {
                 },
                 rng: this.options.rng,
                 arena: this.options.arena,
+                // Nur der letzte Tod bekommt die Schlussgeste (Anhalten, Klatschen,
+                // Nachbeben) — dazwischen geht es weiter.
+                settle: isFinalDeath,
               });
               this.deathTimelines.push(sub);
 
@@ -293,6 +302,49 @@ export class ShowDirector {
                 other.lookAt(victim.brain.x, victim.brain.y);
               }
               audio.play('crowd_ooh', 0.4);
+            },
+            undefined,
+            at
+          );
+          break;
+        }
+
+        /*
+         * Sammeln zwischen zwei Schuessen (Showdown).
+         *
+         * Der `shot`-Beat friert alles ein (`setPhaseSpeed(0)`) — das ist richtig so und
+         * bleibt für die anderen Modi unverändert. Hier ist der **einzige** Ort, der es
+         * wieder auftaut. Ohne ihn stünde die Arena nach dem ersten Tod still, und die
+         * restlichen Schüsse träfen Statuen.
+         */
+        case 'regroup': {
+          const survivors = beat.survivors;
+          regroupIndex += 1;
+          const wave = regroupIndex;
+          timeline.call(
+            () => {
+              // Klammern auf, Kamera raus, Zeit zurück auf normal.
+              scope.release();
+              camera.zoomOut(CHOREO.slowMoRampMs);
+              camera.resetTime();
+              audio.unduckMusic();
+
+              this.aimedId = undefined;
+              for (const playerId of survivors) {
+                const shotling = this.shotlingOf(playerId);
+                // Wer noch fällt, bleibt in seiner Sequenz — `isDriven` schützt sie.
+                if (!shotling || shotling.isDead || shotling.isDriven()) continue;
+                shotling.setState('panic');
+                shotling.resetHead();
+                shotling.brain.burst(FLEE_BURST_MS);
+              }
+
+              // Jede Runde wird ein Stück hektischer, und der Herzschlag zieht mit.
+              this.setPhaseSpeed(ARENA.speed.panic * (1 + wave * CASCADE.panicSpeedStep));
+              const bpmSpan = HEARTBEAT.bpm[1] - HEARTBEAT.bpm[0];
+              audio.startHeartbeat(
+                Math.min(HEARTBEAT.bpm[1], HEARTBEAT.bpm[0] + (bpmSpan * wave) / 3)
+              );
             },
             undefined,
             at

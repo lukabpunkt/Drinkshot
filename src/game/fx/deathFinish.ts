@@ -37,20 +37,35 @@ export function finishDeath(
   const withTombstone = options.tombstone ?? true;
   const delay = (options.delayMs ?? 150) / 1000;
 
+  /*
+   * `settle` heisst: Das war das Ende der Runde. Dann halten alle an, schauen hin, einer
+   * klatscht und die Kamera zoomt nach.
+   *
+   * Im Showdown ist ein Tod nur ein Zwischenschritt — sechsmal dieselbe Schlussgeste
+   * läse sich wie sechs Enden, und die Überlebenden würden für den Rest der Show
+   * stillstehen. Der Grabstein bleibt trotzdem immer: Er zeigt, wer schon liegt.
+   */
+  const settle = ctx.settle ?? true;
+
   timeline.call(
     () => {
       /* --- Die anderen halten an und schauen hin --- */
-      for (const other of others) {
-        if (other.getState() === 'dead') continue;
-        other.setState('idle');
-        other.brain.stop();
-        other.lookAt(options.x, options.y);
+      if (settle) {
+        for (const other of others) {
+          if (other.getState() === 'dead' || other.isDriven()) continue;
+          other.setState('idle');
+          other.brain.stop();
+          other.lookAt(options.x, options.y);
+        }
       }
 
-      // Einer klatscht — winkende Arme, damit die Szene nicht erstarrt wirkt.
+      /*
+       * Der Klatscher wird **immer** gezogen, auch wenn er nicht auftritt: Sonst hinge
+       * der RNG-Strom am Flag und dieselbe Runde liefe nicht mehr identisch ab.
+       */
       if (others.length > 0) {
         const clapper = rng.pick(others);
-        if (clapper.getState() !== 'dead') {
+        if (settle && clapper.getState() !== 'dead' && !clapper.isDriven()) {
           clapper.setFace('happy');
           gsap.to(clapper.rig.armL, {
             rotation: -1.1,
@@ -78,7 +93,7 @@ export function finishDeath(
       }
 
       /* --- Nachbeben: die Kamera zoomt sanft auf das Opfer --- */
-      camera.afterShock();
+      if (settle) camera.afterShock();
     },
     undefined,
     `+=${delay}`

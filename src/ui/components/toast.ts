@@ -3,6 +3,8 @@
  * Genutzt fuer Validierung in der Lobby, PWA-Updates und Asset-Fehler (Roadmap M5.9).
  */
 
+import { safeAnimate } from '@/ui/animate';
+
 export type ToastVariant = 'info' | 'danger' | 'success';
 
 export interface ToastOptions {
@@ -63,10 +65,11 @@ export function showToast(message: string, options: ToastOptions = {}): void {
 
 function dismiss(toast: HTMLElement): void {
   if (!toast.isConnected) return;
-  toast
-    .animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(8px)' }], {
-      duration: 160,
-      fill: 'forwards',
-    })
-    .finished.finally(() => toast.remove());
+  // `safeAnimate`: sonst bleibt der Toast in einem Hintergrund-Tab für immer stehen.
+  void safeAnimate(
+    toast,
+    [{ opacity: 1 }, { opacity: 0, transform: 'translateY(8px)' }],
+    { duration: 160, fill: 'forwards' },
+    { respectReducedMotion: false }
+  ).then(() => toast.remove());
 }

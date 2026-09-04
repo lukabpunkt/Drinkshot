@@ -86,6 +86,10 @@
     "miracleBadge": "Legend",
     "eliminated": "{name} is out.",
     "winner": "{name} survived and hands out {sips}.",
+    "survives": "{name} survives!",
+    "showdownShots": "{count} shots. One left standing.",
+    "showdownSub": "Everyone else drinks their bet. {name} hands out {sips}.",
+    "survivorBadge": "Survivor",
     "needMorePlayers": "Only one person left. Change the players to start a new session.",
     "allBets": "All bets",
     "tableName": "Name",
@@ -132,6 +136,8 @@
     "suddenDeathHint": "Get hit, you're out. The last one hands out.",
     "doubleTap": "Double Tap",
     "doubleTapHint": "Two shots, two victims.",
+    "showdown": "Showdown",
+    "showdownHint": "Shots keep coming until one is left standing.",
     "recommended": "For {count}+ people"
   },
   "rules": {

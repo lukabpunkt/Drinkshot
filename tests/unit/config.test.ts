@@ -16,6 +16,7 @@ import {
   MIN_PLAYERS,
   MODE_SPECS,
   riskTier,
+  victimCount,
 } from '@/config/rules';
 import { PLAYER_COLORS, UI_COLORS, colorById, hex, textColorOn } from '@/config/theme';
 
@@ -35,12 +36,46 @@ describe('rules.ts gegen GDD §3', () => {
     expect(DEFAULT_MODE).toBe('classic');
   });
 
-  it('kennt alle 4 Modi aus GDD §3.6', () => {
-    expect([...GAME_MODES]).toEqual(['classic', 'distributor', 'suddenDeath', 'doubleTap']);
+  it('kennt alle 5 Modi aus GDD §3.6', () => {
+    expect([...GAME_MODES]).toEqual([
+      'classic',
+      'distributor',
+      'suddenDeath',
+      'doubleTap',
+      'showdown',
+    ]);
     expect(MODE_SPECS.doubleTap.victims).toBe(2);
     expect(MODE_SPECS.classic.victims).toBe(1);
+    expect(MODE_SPECS.showdown.victims).toBe('allButOne');
     expect(MODE_SPECS.suddenDeath.eliminates).toBe(true);
     expect(MODE_SPECS.classic.eliminates).toBe(false);
+    // Showdown scheidet nur innerhalb der Runde aus, nicht für die Session.
+    expect(MODE_SPECS.showdown.eliminates).toBe(false);
+  });
+
+  describe('victimCount', () => {
+    it('gibt den Modi mit fester Zahl genau diese', () => {
+      for (let players = MIN_PLAYERS; players <= MAX_PLAYERS; players++) {
+        expect(victimCount('classic', players)).toBe(1);
+        expect(victimCount('distributor', players)).toBe(1);
+        expect(victimCount('suddenDeath', players)).toBe(1);
+        expect(victimCount('doubleTap', players)).toBe(2);
+      }
+    });
+
+    it('lässt im Showdown genau einen übrig', () => {
+      for (let players = MIN_PLAYERS; players <= MAX_PLAYERS; players++) {
+        expect(victimCount('showdown', players)).toBe(players - 1);
+      }
+    });
+
+    it('zieht nie mehr Opfer, als Spieler da sind', () => {
+      // Double Tap zu zweit: sonst wäre die ganze Runde tot.
+      expect(victimCount('doubleTap', 2)).toBe(2);
+      expect(victimCount('doubleTap', 1)).toBe(1);
+      // Und im Showdown bleibt auch bei einer Person eine Ziehung übrig statt keiner.
+      expect(victimCount('showdown', 1)).toBe(1);
+    });
   });
 
   it('Dauer-Presets 10 / 15 / 22 s', () => {

@@ -11,7 +11,7 @@ import {
   MAX_PLAYERS,
   MAX_ROUND_HISTORY,
   MIN_PLAYERS,
-  MODE_SPECS,
+  victimCount,
   STORAGE_KEY,
   type DurationPreset,
   type GameMode,
@@ -93,8 +93,25 @@ export function createEmptySession(): Session {
 /**
  * Wählt die Todesanimation. Bekommt den **seedbaren** PRNG der Runde, damit dieselbe
  * Runde später identisch abgespielt werden kann („Show erneut abspielen" im Dev-Panel).
+ *
+ * Der Kontext sagt, an welcher Stelle der Runde wir stehen. Im Showdown wird mehrfach
+ * gezogen, und die Auswahl braucht das:
+ * - `drawn` verhindert Wiederholungen **innerhalb** einer Runde — bei sieben Toden aus
+ *   acht nutzbaren Sequenzen wären Dubletten sonst fast sicher.
+ * - `index`/`total` sagen, ob noch ein Schuss folgt. Sequenzen mit `needsSecondShot`
+ *   ziehen das Fadenkreuz bis zu einer Sekunde nach dem Tod zurück auf die Leiche — mitten
+ *   in die nächste Suche hinein. Sie dürfen nur als **letzter** Tod vorkommen.
  */
-export type ChooseDeath = (rng: SeededRng) => { deathId: DeathId; zone: DeathZone };
+export interface ChooseDeathContext {
+  drawn: readonly DeathId[];
+  index: number;
+  total: number;
+}
+
+export type ChooseDeath = (
+  rng: SeededRng,
+  context: ChooseDeathContext
+) => { deathId: DeathId; zone: DeathZone };
 
 /**
  * Erzeugt das RoundSetup fuer den Uebergang BET → ARENA.
@@ -110,7 +127,7 @@ export function createRoundSetup(
   durationPreset: DurationPreset,
   chooseDeath?: ChooseDeath
 ): RoundSetup {
-  const victims = pickVictims(bets, MODE_SPECS[mode].victims);
+  const victims = pickVictims(bets, victimCount(mode, bets.length));
   const seed = createSeed();
 
   /*
@@ -119,10 +136,17 @@ export function createRoundSetup(
    * wiederholen.
    */
   const rng = createSeededRng(seed);
-  const draw = (): { deathId: DeathId; zone: DeathZone } =>
-    chooseDeath?.(rng) ?? { deathId: PLACEHOLDER_DEATH_ID, zone: PLACEHOLDER_DEATH_ZONE };
+  const drawn: DeathId[] = [];
+  const draw = (index: number): { deathId: DeathId; zone: DeathZone } => {
+    const result = chooseDeath?.(rng, { drawn, index, total: victims.length }) ?? {
+      deathId: PLACEHOLDER_DEATH_ID,
+      zone: PLACEHOLDER_DEATH_ZONE,
+    };
+    drawn.push(result.deathId);
+    return result;
+  };
 
-  const death = draw();
+  const death = draw(0);
 
   return {
     seed,
@@ -131,7 +155,7 @@ export function createRoundSetup(
     extraVictimIds: victims.slice(1),
     deathId: death.deathId,
     zone: death.zone,
-    extraDeaths: victims.slice(1).map(() => draw()),
+    extraDeaths: victims.slice(1).map((_, index) => draw(index + 1)),
     mode,
     durationPreset,
   };
@@ -200,6 +224,35 @@ export function resolveRound(setup: RoundSetup, finishedAt = Date.now()): RoundR
         drinkers: victims.map((playerId) => ({ playerId, sips: betOf(setup, playerId) })),
         eliminatedIds: [],
       };
+    }
+
+    case 'showdown': {
+      /*
+       * Es wird geschossen, bis einer steht. Jeder Getroffene trinkt seinen eigenen
+       * Einsatz, der Überlebende verteilt seinen (GDD §3.6).
+       */
+      const victims = [setup.victimId, ...setup.extraVictimIds];
+      const survivor = setup.bets
+        .map((bet) => bet.playerId)
+        .find((playerId) => !victims.includes(playerId));
+
+      const result: RoundResult = {
+        ...base,
+        drinkers: victims.map((playerId) => ({ playerId, sips: betOf(setup, playerId) })),
+        /*
+         * **Leer, und das ist wichtig:** `eliminatedIds` gilt für die ganze Session
+         * (`eliminatedPlayerIds` sammelt über alle Runden, `activePlayers` filtert
+         * danach). Trüge Showdown seine Erschossenen hier ein, wäre die Session nach
+         * einer Runde vorbei — „Nächste Runde" ausgegraut. Das Ausscheiden gilt nur
+         * innerhalb der Runde.
+         */
+        eliminatedIds: [],
+      };
+      if (survivor !== undefined) {
+        result.winnerId = survivor;
+        result.sipsToDistribute = betOf(setup, survivor);
+      }
+      return result;
     }
 
     case 'suddenDeath': {

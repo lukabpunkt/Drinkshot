@@ -99,6 +99,22 @@ describe(`Fairness-Kette über ${ROUNDS.toLocaleString('de-DE')} Runden`, () => 
           expect(result.drinkers[0]?.playerId).toBe(setup.victimId);
           expect(result.drinkers.length).toBe(Math.min(2, bets.length));
           break;
+        case 'showdown': {
+          // Alle bis auf einen trinken ihren eigenen Einsatz, der Letzte verteilt.
+          expect(result.drinkers).toHaveLength(bets.length - 1);
+          for (const drinker of result.drinkers) {
+            const own = bets.find((bet) => bet.playerId === drinker.playerId)?.sips;
+            expect(drinker.sips).toBe(own);
+          }
+          const drinking = new Set(result.drinkers.map((drinker) => drinker.playerId));
+          expect(drinking.has(result.winnerId!)).toBe(false);
+          expect(result.sipsToDistribute).toBe(
+            bets.find((bet) => bet.playerId === result.winnerId)?.sips
+          );
+          // Niemand scheidet dauerhaft aus — sonst wäre die Session nach einer Runde vorbei.
+          expect(result.eliminatedIds).toEqual([]);
+          break;
+        }
       }
     }
   });

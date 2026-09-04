@@ -136,3 +136,54 @@ describe('pickVictims — Modus "Double Tap" (ohne Zuruecklegen)', () => {
     expect(Math.abs(firstIsHeavy / rounds - 10 / 13)).toBeLessThan(TOLERANCE);
   });
 });
+
+describe('pickVictims — der Showdown zieht bis auf einen', () => {
+  const ROUNDS = 100_000;
+
+  /** Wer überlebt, ist der, der nicht gezogen wurde. */
+  function survivorRates(sips: readonly number[]): number[] {
+    const table = sips.map((value, index) => ({ playerId: `p${index}`, sips: value }));
+    const counts = new Array<number>(table.length).fill(0);
+
+    for (let i = 0; i < ROUNDS; i++) {
+      const victims = new Set(pickVictims(table, table.length - 1));
+      const index = table.findIndex((bet) => !victims.has(bet.playerId));
+      counts[index] = (counts[index] ?? 0) + 1;
+    }
+    return counts.map((count) => count / ROUNDS);
+  }
+
+  it('zieht genau n-1 verschiedene Opfer', () => {
+    const table = bets(1, 2, 3, 4, 5, 6);
+    for (let i = 0; i < 200; i++) {
+      const victims = pickVictims(table, table.length - 1);
+      expect(victims).toHaveLength(5);
+      expect(new Set(victims).size).toBe(5);
+    }
+  });
+
+  it('bei gleichen Einsätzen überlebt jeder gleich oft', () => {
+    /*
+     * Das ist die harte Zusicherung des Modus. Bei identischen Gewichten ist die Ziehung
+     * eine gleichverteilte Permutation — jeder muss auf 1/n kommen. Wäre das nicht so,
+     * hinge das Überleben an der Sitzposition.
+     */
+    const rates = survivorRates([3, 3, 3, 3, 3, 3]);
+    for (const rate of rates) {
+      expect(Math.abs(rate - 1 / 6)).toBeLessThan(0.01);
+    }
+  });
+
+  it('wer mehr setzt, überlebt seltener — streng fallend', () => {
+    const rates = survivorRates([1, 2, 3, 4, 5, 6]);
+    for (let i = 1; i < rates.length; i++) {
+      expect(rates[i]!).toBeLessThan(rates[i - 1]!);
+    }
+  });
+
+  it('die Überlebensraten summieren sich auf 1', () => {
+    const rates = survivorRates([1, 4, 9]);
+    const total = rates.reduce((sum, rate) => sum + rate, 0);
+    expect(Math.abs(total - 1)).toBeLessThan(1e-9);
+  });
+});

@@ -400,3 +400,113 @@ describe('createRoundSetup — Double Tap zieht eine Sequenz je Opfer', () => {
     expect(round.extraDeaths).toHaveLength(0);
   });
 });
+
+describe('resolveRound — Showdown', () => {
+  it('lässt alle bis auf einen trinken, jeder seinen eigenen Einsatz', () => {
+    const round = resolveRound(
+      setup({ mode: 'showdown', victimId: 'p1', extraVictimIds: ['p3'] })
+    );
+
+    // p1 (2) und p3 (5) sind gefallen, p2 (3) steht noch.
+    expect(round.drinkers).toEqual([
+      { playerId: 'p1', sips: 2 },
+      { playerId: 'p3', sips: 5 },
+    ]);
+  });
+
+  it('macht den Übriggebliebenen zum Gewinner, der seinen Einsatz verteilt', () => {
+    const round = resolveRound(
+      setup({ mode: 'showdown', victimId: 'p1', extraVictimIds: ['p3'] })
+    );
+
+    expect(round.winnerId).toBe('p2');
+    // Seinen eigenen Einsatz, nicht den Pot.
+    expect(round.sipsToDistribute).toBe(3);
+  });
+
+  it('scheidet niemanden für die Session aus — das ist der Unterschied zu Sudden Death', () => {
+    const showdown = resolveRound(
+      setup({ mode: 'showdown', victimId: 'p1', extraVictimIds: ['p3'] })
+    );
+    const suddenDeath = resolveRound(setup({ mode: 'suddenDeath', victimId: 'p1' }));
+
+    expect(showdown.eliminatedIds).toEqual([]);
+    expect(suddenDeath.eliminatedIds).toEqual(['p1']);
+  });
+
+  it('bleibt zu zweit sinnvoll: einer trinkt, einer verteilt', () => {
+    const round = resolveRound(
+      setup({
+        bets: [
+          { playerId: 'a', sips: 4 },
+          { playerId: 'b', sips: 6 },
+        ],
+        mode: 'showdown',
+        victimId: 'a',
+        extraVictimIds: [],
+      })
+    );
+
+    expect(round.drinkers).toEqual([{ playerId: 'a', sips: 4 }]);
+    expect(round.winnerId).toBe('b');
+    expect(round.sipsToDistribute).toBe(6);
+  });
+
+  it('die Session läuft danach weiter — alle sind wieder dabei', () => {
+    const session = createSessionStore();
+    session.addPlayer((index) => `Spieler ${index}`);
+    session.addPlayer((index) => `Spieler ${index}`);
+    session.addPlayer((index) => `Spieler ${index}`);
+    const [a, b, c] = session.state.players.map((player) => player.id);
+
+    session.recordRound(
+      resolveRound(
+        setup({
+          bets: [
+            { playerId: a!, sips: 2 },
+            { playerId: b!, sips: 3 },
+            { playerId: c!, sips: 4 },
+          ],
+          mode: 'showdown',
+          victimId: a!,
+          extraVictimIds: [b!],
+        })
+      )
+    );
+
+    expect(session.activePlayers()).toHaveLength(3);
+    expect(session.canStart()).toBe(true);
+  });
+});
+
+describe('createRoundSetup — Showdown zieht bis auf einen', () => {
+  it('erschiesst alle bis auf einen und zieht je eine Sequenz', () => {
+    let calls = 0;
+    const round = createRoundSetup(BETS, 'showdown', 'normal', () => {
+      calls += 1;
+      return { deathId: `death_${calls}` as DeathId, zone: 'body' };
+    });
+
+    // Drei Spieler → zwei fallen, einer bleibt.
+    expect(round.extraVictimIds).toHaveLength(1);
+    expect(round.extraDeaths).toHaveLength(1);
+    expect(calls).toBe(2);
+
+    const victims = new Set([round.victimId, ...round.extraVictimIds]);
+    expect(victims.size).toBe(2);
+  });
+
+  it('reicht der Auswahl durch, an welcher Stelle der Runde sie steht', () => {
+    const seen: { index: number; total: number; drawn: readonly string[] }[] = [];
+    createRoundSetup(BETS, 'showdown', 'normal', (_rng, context) => {
+      seen.push({ index: context.index, total: context.total, drawn: [...context.drawn] });
+      return { deathId: `death_${context.index}` as DeathId, zone: 'body' };
+    });
+
+    expect(seen.map((entry) => entry.index)).toEqual([0, 1]);
+    expect(seen.every((entry) => entry.total === 2)).toBe(true);
+    // Die zweite Ziehung kennt die erste — sonst gäbe es Dubletten in einer Runde.
+    expect(seen[0]!.drawn).toEqual([]);
+    expect(seen[1]!.drawn).toEqual(['death_0']);
+  });
+});

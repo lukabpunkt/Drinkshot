@@ -40,7 +40,13 @@ export function riskTier(bet: number): RiskTierId {
 /* Modi (GDD §3.6)                                                     */
 /* ------------------------------------------------------------------ */
 
-export const GAME_MODES = ['classic', 'distributor', 'suddenDeath', 'doubleTap'] as const;
+export const GAME_MODES = [
+  'classic',
+  'distributor',
+  'suddenDeath',
+  'doubleTap',
+  'showdown',
+] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 
 /** ADR-3: Klassik ist Default. */
@@ -48,8 +54,8 @@ export const DEFAULT_MODE: GameMode = 'classic';
 
 export interface ModeSpec {
   id: GameMode;
-  /** Anzahl Opfer pro Runde. */
-  victims: number;
+  /** Feste Opferzahl pro Runde — oder alle bis auf einen (Showdown). */
+  victims: number | 'allButOne';
   /** Getroffener scheidet fuer die Session aus. */
   eliminates: boolean;
   /** Empfohlene Mindest-Spielerzahl (nur UI-Hinweis, keine Sperre). */
@@ -61,7 +67,20 @@ export const MODE_SPECS: Record<GameMode, ModeSpec> = {
   distributor: { id: 'distributor', victims: 1, eliminates: false, recommendedMinPlayers: MIN_PLAYERS },
   suddenDeath: { id: 'suddenDeath', victims: 1, eliminates: true, recommendedMinPlayers: 5 },
   doubleTap: { id: 'doubleTap', victims: 2, eliminates: false, recommendedMinPlayers: 6 },
+  showdown: { id: 'showdown', victims: 'allButOne', eliminates: false, recommendedMinPlayers: 3 },
 };
+
+/**
+ * Wie viele Opfer diese Runde hat. Einzige Stelle, die `ModeSpec.victims` auflöst.
+ *
+ * Showdown schiesst, bis einer steht — die Zahl haengt also an der Spielerzahl. Der
+ * Ueberlebende ist der, der nicht gezogen wurde.
+ */
+export function victimCount(mode: GameMode, playerCount: number): number {
+  const spec = MODE_SPECS[mode].victims;
+  if (spec === 'allButOne') return Math.max(1, playerCount - 1);
+  return Math.min(spec, playerCount);
+}
 
 /* ------------------------------------------------------------------ */
 /* Dauer-Presets (GDD §3.5)                                            */

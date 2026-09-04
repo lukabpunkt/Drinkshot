@@ -6,10 +6,12 @@
  * Beim letzten Spieler loest `confirm` in der FSM die Ziehung aus (ADR-2).
  */
 
-import { DEFAULT_BET } from '@/config/rules';
+import { COACHMARK_MS, DEFAULT_BET } from '@/config/rules';
 import { colorById, hex, MOTION } from '@/config/theme';
 import { t } from '@/core/i18n';
+import { prefersReducedMotion } from '@/ui/animate';
 import { createButton } from '@/ui/components/button';
+import { createCoachmark } from '@/ui/components/coachmark';
 import { createBetStepper } from '@/ui/components/stepper';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
@@ -46,6 +48,10 @@ export function createBetScreen(ctx: ScreenContext): ScreenInstance {
 
   el.append(who, headline, stepper.el, hint, confirm);
 
+  // Einmaliger Hinweis in der ersten Runde: was der Einsatz eigentlich bedeutet.
+  const coach = createCoachmark('bet', { autoDismissMs: COACHMARK_MS });
+  if (coach.el) el.append(coach.el);
+
   let submitted = false;
 
   const submit = async (): Promise<void> => {
@@ -67,6 +73,7 @@ export function createBetScreen(ctx: ScreenContext): ScreenInstance {
       ).finished;
     }
 
+    coach.dismiss();
     ctx.fsm.send({ type: 'confirm', sips: stepper.getValue() });
   };
 
@@ -78,11 +85,8 @@ export function createBetScreen(ctx: ScreenContext): ScreenInstance {
       confirm.focus({ preventScroll: true });
     },
     destroy() {
+      coach.dismiss();
       stepper.destroy();
     },
   };
-}
-
-function prefersReducedMotion(): boolean {
-  return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 }

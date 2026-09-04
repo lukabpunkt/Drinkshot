@@ -17,6 +17,7 @@ import { setAudioEnabled } from '@/audio/AudioManager';
 import { LOCALES, setLocale, t } from '@/core/i18n';
 import { createButton } from '@/ui/components/button';
 import { openSheet, type SheetHandle } from '@/ui/components/sheet';
+import { resetCoachmarks } from '@/ui/components/coachmark';
 import { showToast } from '@/ui/components/toast';
 import { setHapticsEnabled } from '@/ui/haptics';
 import type { ScreenContext } from '@/ui/router';
@@ -196,6 +197,8 @@ export function openSettingsSheet(ctx: ScreenContext): SheetHandle {
     className: 'btn--block settings__reset',
     onClick: () => {
       ctx.session.reset();
+      // Wer die Session zurücksetzt, will von vorne anfangen — inklusive der Hinweise.
+      resetCoachmarks();
       showToast(t('settings.resetDone'), { variant: 'success' });
       handle.close();
       void ctx.router.refresh();

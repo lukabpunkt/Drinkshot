@@ -1,11 +1,10 @@
 /**
  * Title-Screen (GDD §6.0, Roadmap M1.3).
  *
- * Logo mit Wobble, drei Buttons, Sound-Toggle. Der erste Tap auf "Spielen" entsperrt
- * den AudioContext (iOS-Pflicht). Beim allerersten Start erscheint einmalig der
- * 18+-Hinweis; das Flag liegt in localStorage.
- *
- * TODO(M5): laufendes Maennchen im Loop, das erschossen wird (echte Arena-Mini-Instanz).
+ * Logo mit Wobble, drei Buttons, Sound-Toggle, dahinter der laufende Shotling im Loop
+ * (`components/titleLoop.ts`). Der erste Tap auf "Spielen" entsperrt den AudioContext
+ * (iOS-Pflicht). Beim allerersten Start erscheint einmalig der 18+-Hinweis; das Flag
+ * liegt in localStorage.
  */
 
 import { STORAGE_KEY_DISCLAIMER } from '@/config/rules';
@@ -13,6 +12,7 @@ import { unlockAudio } from '@/audio/AudioManager';
 import { t } from '@/core/i18n';
 import { createButton, setButtonLabel } from '@/ui/components/button';
 import { openSheet } from '@/ui/components/sheet';
+import { createTitleLoop } from '@/ui/components/titleLoop';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
 import { openRulesSheet } from './RulesSheet';
@@ -139,7 +139,7 @@ export function createTitleScreen(ctx: ScreenContext): ScreenInstance {
   version.className = 'title__version';
   version.textContent = `v${__APP_VERSION__}`;
 
-  el.append(logo, tagline, actions, soundToggle, version);
+  el.append(createTitleLoop(), logo, tagline, actions, soundToggle, version);
 
   return {
     el,

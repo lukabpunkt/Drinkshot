@@ -77,3 +77,29 @@ export function growBar(el: HTMLElement, percent: number, delayMs = 0): void {
   // Erst im nächsten Frame setzen, sonst sieht der Browser nur den Endwert.
   setTimeout(() => el.style.setProperty('--score-fill', target), Math.max(delayMs, 16));
 }
+
+/**
+ * `Element.animate`, aber ohne Absturz, wenn es die Web Animations API nicht gibt.
+ *
+ * In jedem Zielbrowser gibt es sie — aber nicht in jsdom, und nicht in sehr alten
+ * WebViews. Eine fehlende Schmuck-Animation darf keinen Ablauf abbrechen, und genau das
+ * passiert, wenn irgendwo `await el.animate(...).finished` steht.
+ *
+ * Fehlt sie, ist der Effekt sofort fertig: Das Versprechen löst direkt auf, der Aufrufer
+ * macht weiter, und das Ergebnis sieht aus wie bei „Bewegung reduzieren".
+ */
+export function safeAnimate(
+  el: Element,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions
+): Promise<void> {
+  if (prefersReducedMotion() || typeof el.animate !== 'function') return Promise.resolve();
+  try {
+    return el.animate(keyframes, options).finished.then(
+      () => undefined,
+      () => undefined
+    );
+  } catch {
+    return Promise.resolve();
+  }
+}

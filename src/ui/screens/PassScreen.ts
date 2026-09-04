@@ -6,9 +6,10 @@
  * durch und der Nachbar sieht das Bet-UI (Audit A1, MUSS).
  */
 
-import { PASS_TAP_LOCK_MS } from '@/config/rules';
+import { COACHMARK_MS, PASS_TAP_LOCK_MS } from '@/config/rules';
 import { colorById, hex, textColorOn } from '@/config/theme';
 import { t } from '@/core/i18n';
+import { createCoachmark } from '@/ui/components/coachmark';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
 
@@ -53,6 +54,10 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   inner.append(position, lead, name, instruction);
   el.append(stripes, inner);
 
+  // Einmaliger Hinweis in der ersten Runde: warum das Handy überhaupt wandert.
+  const coach = createCoachmark('pass', { autoDismissMs: COACHMARK_MS });
+  if (coach.el) el.append(coach.el);
+
   /* --- Tap-Sperre --- */
   let armed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -60,6 +65,7 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   const onTap = (): void => {
     if (!armed) return;
     armed = false;
+    coach.dismiss();
     vibrate('tap');
     ctx.fsm.send({ type: 'tap' });
   };
@@ -87,6 +93,7 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
       el.focus({ preventScroll: true });
     },
     destroy() {
+      coach.dismiss();
       if (timer !== undefined) clearTimeout(timer);
     },
   };

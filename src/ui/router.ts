@@ -65,7 +65,12 @@ import { prefersReducedMotion } from '@/ui/animate';
  * die Screens ohnehin bildschirmfüllend sind und ein Sprung nur ruckelt.
  */
 function focusScreen(el: HTMLElement): void {
-  el.tabIndex = -1;
+  /*
+   * Nur setzen, wenn der Screen nicht selbst ein Bedienelement ist: Der Pass-Screen ist
+   * eine grosse Taste mit `tabindex="0"` — auf -1 gezogen wäre er per Tastatur nicht mehr
+   * erreichbar.
+   */
+  if (!el.hasAttribute('tabindex')) el.tabIndex = -1;
   try {
     el.focus({ preventScroll: true });
   } catch {

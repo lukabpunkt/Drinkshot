@@ -136,3 +136,9 @@ export const STORAGE_KEY = 'drinkshot.session.v1';
 
 /** localStorage-Key fuer den einmaligen 18+-Hinweis (Roadmap M1). */
 export const STORAGE_KEY_DISCLAIMER = 'drinkshot.disclaimer.v1';
+
+/** Praefix der Onboarding-Flags — je Hinweis ein Eintrag (Roadmap M5.8). */
+export const STORAGE_KEY_ONBOARDING = 'drinkshot.onboarding.v1';
+
+/** Wie lange ein Coachmark stehen bleibt, wenn niemand ihn wegtippt. */
+export const COACHMARK_MS = 5200;

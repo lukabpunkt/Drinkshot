@@ -33,11 +33,14 @@ export interface ShowDirectorOptions {
   rng: SeededRng;
   /** Alle Männchen, nach PlayerId. */
   shotlings: Map<PlayerId, Shotling>;
-  victimId: PlayerId;
   /** Wird nach dem Outro gerufen — die FSM schaltet dann auf RESULT. */
   onFinished: () => void;
-  /** Nach dem Schuss darf übersprungen werden (GDD §6.4). */
-  onShotFired?: () => void;
+  /**
+   * Ein Schuss ist gefallen. `final` sagt, ob es der letzte der Runde war — im Showdown
+   * fallen mehrere, und der Skip-Knopf darf nicht schon nach dem ersten erscheinen
+   * (sonst wären 80 % der Runde überspringbar).
+   */
+  onShotFired?: (info: { index: number; total: number; final: boolean }) => void;
   /**
    * Der Lock rastet ein. Die Haptik hängt sich hier ein — sie muss auch dann pulsieren,
    * wenn der Ton aus ist, und darf deshalb nicht am Audio-Herzschlag hängen (Roadmap M5.4).
@@ -52,8 +55,12 @@ export class ShowDirector {
   private readonly timeline: gsap.core.Timeline;
   private readonly options: ShowDirectorOptions;
   private aimedId: PlayerId | undefined;
-  /** Die Todesanimation läuft als eigene Timeline; die Show wartet auf sie. */
-  private deathTimeline: gsap.core.Timeline | undefined;
+  /**
+   * Die Todesanimationen laufen als eigene Timelines neben der Show — im Showdown mehrere
+   * überlappend. Deshalb eine Liste: Ein einzelnes Feld hätte die vorherige überschrieben
+   * und die Show nur auf die letzte gewartet.
+   */
+  private readonly deathTimelines: gsap.core.Timeline[] = [];
 
   constructor(options: ShowDirectorOptions) {
     this.options = options;
@@ -67,11 +74,20 @@ export class ShowDirector {
    * ist — sonst schneidet der Result-Screen den Tod ab.
    */
   private handleComplete(): void {
-    if (this.deathTimeline?.isActive()) {
-      this.deathTimeline.eventCallback('onComplete', () => this.options.onFinished());
+    /*
+     * Über die **Restlaufzeit** warten, nicht über `eventCallback('onComplete')`: Das
+     * würde einen Callback überschreiben, den die Sequenz selbst gesetzt hat.
+     */
+    const remainingMs = this.deathTimelines.reduce((max, timeline) => {
+      if (!timeline.isActive()) return max;
+      return Math.max(max, timeline.totalDuration() - timeline.totalTime());
+    }, 0);
+
+    if (remainingMs <= 0) {
+      this.options.onFinished();
       return;
     }
-    this.options.onFinished();
+    gsap.delayedCall(remainingMs, () => this.options.onFinished());
   }
 
   private shotlingOf(id: PlayerId): Shotling | undefined {
@@ -85,8 +101,14 @@ export class ShowDirector {
   private setAimed(id: PlayerId | undefined): void {
     if (this.aimedId === id) return;
 
+    /*
+     * `isDriven()` ist der entscheidende Teil der Bedingung: Eine Sequenz setzt
+     * `setState('dead')` erst an ihrem **Ende**. Ein Männchen, dessen Todesanimation noch
+     * läuft, ist also nicht `'dead'` — ohne diesen Guard bekäme es hier `panic` + `burst`
+     * und liefe los, während GSAP sein Rig animiert.
+     */
     const previous = this.aimedId ? this.shotlingOf(this.aimedId) : undefined;
-    if (previous && previous.getState() !== 'dead') {
+    if (previous && previous.getState() !== 'dead' && !previous.isDriven()) {
       previous.setState('panic');
       previous.resetHead();
       previous.brain.burst(FLEE_BURST_MS);
@@ -94,7 +116,7 @@ export class ShowDirector {
 
     this.aimedId = id;
     const next = id ? this.shotlingOf(id) : undefined;
-    if (next && next.getState() !== 'dead') {
+    if (next && next.getState() !== 'dead' && !next.isDriven()) {
       next.setState('aimed');
       next.lookAt(this.options.scope.centerX, this.options.scope.centerY);
     }
@@ -111,7 +133,14 @@ export class ShowDirector {
   /* ------------------------------------------------------------------ */
 
   private build(): void {
-    const { script, scope, camera, particles, shotlings, victimId } = this.options;
+    const { script, scope, camera, particles, shotlings } = this.options;
+
+    /*
+     * Wie viele Schüsse fallen und der wievielte gerade dran ist. Der Skip-Knopf hängt
+     * daran: Im Showdown darf er erst nach dem letzten erscheinen.
+     */
+    const shotCount = script.beats.filter((beat) => beat.type === 'shot').length;
+    let shotIndex = 0;
     const timeline = this.timeline;
 
     for (const beat of script.beats) {
@@ -176,13 +205,16 @@ export class ShowDirector {
 
         case 'lock': {
           const holdMs = beat.holdMs;
+          // Das Ziel steht im Beat. Vorher stand hier `options.victimId` — der zweite
+          // Double-Tap-Lock fuhr damit auf das bereits tote erste Opfer zurück.
+          const lockTarget = beat.target;
           timeline.call(
             () => {
-              const victim = this.shotlingOf(victimId);
+              const victim = this.shotlingOf(lockTarget);
               if (!victim) return;
 
               scope.aimAt(victim.aimPoint, CHOREO.hopMs[0], 'snap');
-              this.setAimed(victimId);
+              this.setAimed(lockTarget);
 
               audio.play('lock_engage');
               audio.duckMusic();
@@ -203,7 +235,10 @@ export class ShowDirector {
           break;
         }
 
-        case 'shot':
+        case 'shot': {
+          shotIndex += 1;
+          const currentShot = shotIndex;
+          const isFinalShot = shotIndex === shotCount;
           timeline.call(
             () => {
               // Slow-Mo bricht mit dem Knall ab (GDD §3.5).
@@ -213,12 +248,17 @@ export class ShowDirector {
               scope.flash();
               camera.shakeScreen();
               this.setPhaseSpeed(0);
-              this.options.onShotFired?.();
+              this.options.onShotFired?.({
+                index: currentShot,
+                total: shotCount,
+                final: isFinalShot,
+              });
             },
             undefined,
             at
           );
           break;
+        }
 
         case 'death': {
           const deathId = beat.deathId;
@@ -244,7 +284,7 @@ export class ShowDirector {
                 rng: this.options.rng,
                 arena: this.options.arena,
               });
-              this.deathTimeline = sub;
+              this.deathTimelines.push(sub);
 
               // Die anderen bleiben stehen und schauen hin (GDD §4.2, Nachbeben).
               for (const other of others) {
@@ -309,9 +349,17 @@ export class ShowDirector {
     this.timeline.resume();
   }
 
-  /** Springt ans Ende — „Tap zum Überspringen" nach dem Schuss (GDD §6.4). */
+  /**
+   * Springt ans Ende — „Tap zum Überspringen" nach dem Schuss (GDD §6.4).
+   *
+   * `progress(1)` allein würde alle übersprungenen `call()`s **synchron** nachfeuern: Im
+   * Showdown wären das bis zu sieben Todesanimationen auf einmal. Deshalb `suppressEvents`
+   * und die laufenden Sequenzen abräumen.
+   */
   skipToEnd(): void {
-    this.timeline.progress(1);
+    this.timeline.progress(1, true);
+    for (const timeline of this.deathTimelines) timeline.kill();
+    this.deathTimelines.length = 0;
   }
 
   get progress(): number {
@@ -320,6 +368,8 @@ export class ShowDirector {
 
   destroy(): void {
     this.timeline.kill();
+    for (const timeline of this.deathTimelines) timeline.kill();
+    this.deathTimelines.length = 0;
     audio.stopHeartbeat();
     audio.unduckMusic();
   }

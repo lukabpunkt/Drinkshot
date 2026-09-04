@@ -399,28 +399,27 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       particles,
       rng,
       shotlings,
-      victimId: round.victimId,
       onFinished: () => {
         if (!isHoldMode(ctx.dev)) finish();
       },
-      onShotFired: () => {
+      onShotFired: ({ final }) => {
         stopLockPulse();
         vibrate('shot');
-        skip.hidden = false;
         lockLabel.hidden = true;
+        // Erst nach dem letzten Schuss: Im Showdown fallen mehrere, und wer nach dem
+        // ersten überspringen darf, verpasst den Rest der Runde.
+        if (final) skip.hidden = false;
       },
-      onLockEngaged: startLockPulse,
+      onLockEngaged: () => {
+        startLockPulse();
+        /*
+         * Das LOCK-Schild hängt jetzt am Beat statt an einem `setTimeout` auf die
+         * Wanduhr: Das driftete beim Tab-Wechsel gegen die Show und erschien nur beim
+         * ersten Lock. In der Death-Preview läuft keine Show, also auch kein Schild.
+         */
+        if (!isDeathPreview(ctx.dev)) lockLabel.hidden = false;
+      },
     });
-
-    // LOCK-Schriftzug einblenden, wenn der Lock-Beat kommt.
-    const lockBeat = isDeathPreview(ctx.dev)
-      ? undefined
-      : script.beats.find((beat) => beat.type === 'lock');
-    if (lockBeat) {
-      globalThis.setTimeout(() => {
-        if (!disposed && !finished) lockLabel.hidden = false;
-      }, lockBeat.t);
-    }
 
     /* --- Tab-Wechsel: pausieren statt weiterlaufen (Audit A3) --- */
     onVisibility = () => {

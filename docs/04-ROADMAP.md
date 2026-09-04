@@ -135,18 +135,20 @@ Schritte:
 
 Schritte:
 
-1. Titel-Screen: laufendes Männchen wird im Loop erschossen (nutzt echte Arena-Mini-Instanz oder vorgerenderte Sequenz), Logo-Wobble, Musik-Loop.
+1. Titel-Screen: laufendes Männchen wird im Loop erschossen — **als Inline-SVG mit CSS-Keyframes**, nicht als Arena-Mini-Instanz: die würde den Renderer beim Start laden und das Code-Splitting aus Schritt 10 aufheben (ADR-38). Logo-Wobble. Musik-Loop **verschoben** — es gibt keinen Musik-Track, der Ton ist prozedural (ADR-20); gehört zu M6, falls Musik dazukommt.
 2. Modi finalisieren und im UI erklären (Modus-Chip mit 1-Satz-Beschreibung), Sudden-Death-Ausscheiden visualisiert (Grabstein-Badge in der Lobby), Double-Tap (2 Opfer, Show verlängert).
 3. Result-Screen-Juice: Number-Punch, Kamera-Nachbeben ins Standbild, "Alle Einsätze"-Tabelle mit Count-Up, Scoreboard-Animationen, "Legend"-Badge bei Miracle.
 4. Haptik-Muster (Lock: kurze Pulse im Herzschlag-Takt, Shot: 60 ms, Reveal: doppelt).
-5. Arena-Themen (Wiese/Wüste/Nacht/Schnee) als Boden-Tint + Prop-Sets (Nice-to-have, wenn Zeit).
+5. ~~Arena-Themen (Wiese/Wüste/Nacht/Schnee) als Boden-Tint + Prop-Sets~~ — **nicht gebaut.** Nice-to-have, das Atlas-Fläche kostet und kein Problem löst, das im Playtest aufgefallen wäre. Entscheidung neu bewerten, wenn A6 sagt, dass die Arena eintönig wirkt.
 6. Accessibility: Fokus-Reihenfolge, `aria-live` für Result, Farbenblind-Symbole überall sichtbar, Reduced-Motion, Kontrast-Check aller Texte.
 7. i18n EN komplett, Sprach-Toggle.
-8. Onboarding: Erste Runde zeigt 2 Tooltips (Bet-Screen: "Mehr = riskanter", Arena: "Nichts tun. Zuschauen. Zittern.").
+8. Onboarding: Erste Runde zeigt 2 Tooltips — **Bet-Screen** ("Mehr Einsatz, mehr Risiko") und **Pass-Screen** ("Reich das Handy weiter"). Der zweite wanderte von der Arena zum Pass: In der Arena schaut man ohnehin nur zu, dort erklärt sich alles von selbst; beim Weitergeben entscheidet sich dagegen, ob das Spiel funktioniert.
 9. Error-Resilience: WebGL-Fail → Canvas-Fallback (PIXI macht das) oder Hinweis; Atlas-Load-Fail → Retry + Toast.
 10. Bundle-Analyse (`rollup-plugin-visualizer`), Code-Splitting: Arena-Chunk lazy laden während LOBBY.
 
 **Definition of Done:** Lighthouse Mobile Perf ≥ 90, A11y ≥ 90, Bundle-Budget eingehalten, alle Modi spielbar, EN vollständig.
+
+**Erreicht (2026-09-04):** Perf 100 · A11y 96 · Best Practices 100 · JS 249 KB gzip (Einstieg 21 KB) · alle vier Modi spielbar, Double Tap erschiesst jetzt tatsächlich beide Opfer (ADR-37) · EN deckungsgleich mit 127 Schlüsseln. Bericht in `PROGRESS.md`.
 
 → **Audit A5** (Polish-, Accessibility- & Bundle-Audit)
 

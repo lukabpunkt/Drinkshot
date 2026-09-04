@@ -6,7 +6,14 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { ARENA_TIMEOUT, betAllAndStart, enterLobby, placeBet, tapPass } from './helpers';
+import {
+  ARENA_TIMEOUT,
+  betAllAndStart,
+  enterLobby,
+  placeBet,
+  startShow,
+  tapPass,
+} from './helpers';
 
 const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
 
@@ -20,8 +27,8 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
-async function freshStart(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+async function freshStart(page: Page, settings?: Record<string, unknown>): Promise<void> {
+  await page.addInitScript((extra: Record<string, unknown> | undefined) => {
     // Nur beim allerersten Laden aufräumen — sonst würde ein Reload im Test
     // genau die Persistenz zerstören, die er prüfen soll.
     if (window.sessionStorage.getItem('e2e-initialised')) return;
@@ -37,9 +44,9 @@ async function freshStart(page: Page): Promise<void> {
      */
     window.localStorage.setItem(
       'drinkshot.session.v1',
-      JSON.stringify({ players: [], rounds: [], settings: { miracles: false } })
+      JSON.stringify({ players: [], rounds: [], settings: { miracles: false, ...extra } })
     );
-  });
+  }, settings);
   await page.goto('./');
 }
 
@@ -329,4 +336,74 @@ test('Portrait scrollt nicht horizontal', async ({ page }) => {
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth
   );
   expect(overflow).toBe(false);
+});
+
+test('Hauptmenue ist aus jedem Screen erreichbar (ADR-55)', async ({ page }) => {
+  await freshStart(page);
+
+  /*
+   * Bis ADR-55 gab es keinen einzigen Uebergang zurueck an den Titel — wer einmal
+   * "Spielen" gedrueckt hatte, kam bis zum Neuladen nicht mehr hin.
+   */
+  await page.getByRole('button', { name: 'Spielen' }).click();
+  await expect(page.locator('.screen--lobby')).toBeVisible();
+  await page.getByRole('button', { name: 'Zurück zum Hauptmenü' }).click();
+  await expect(page.locator('.screen--title')).toBeVisible();
+
+  // Und aus einer laufenden Runde ueber den Abbruch-Dialog in die Lobby.
+  await enterLobby(page, 2);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+  await expect(page.locator('.screen--pass')).toBeVisible();
+
+  await page.locator('.screen--pass .screen__exit').click();
+  const dialog = page.getByRole('dialog', { name: 'Runde abbrechen?' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Ja, abbrechen' }).click();
+  await expect(page.locator('.screen--lobby')).toBeVisible();
+
+  /*
+   * Der Zurueck-Knopf muss beim **ersten** Druck wirken. Frueher leckten die
+   * History-Eintraege des Guards, und in der Lobby verpuffte der erste Druck folgenlos.
+   */
+  await page.goBack();
+  await expect(page.locator('.screen--title')).toBeVisible();
+});
+
+test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-53)', async ({ page }) => {
+  test.setTimeout(240_000);
+
+  await freshStart(page, { mode: 'suddenDeath', duration: 'short', miracles: false, sound: false });
+  await enterLobby(page, 3);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  // Runde 1: alle drei setzen.
+  await betAllAndStart(page, { bets: [1, 2, 3] });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: ARENA_TIMEOUT });
+  await expect(page.locator('.result__sub')).toContainText('ist raus');
+
+  /*
+   * Der entscheidende Schritt: "Weiter" fuehrt direkt auf den Start-Screen, **nicht**
+   * zurueck in die Setzphase. Frueher wanderte das Handy erneut durch die Runde, obwohl
+   * das Feld schon kleiner war.
+   */
+  await page.getByRole('button', { name: 'Weiter', exact: true }).click();
+  await expect(page.locator('.screen--ready')).toBeVisible();
+  await expect(page.locator('.screen--pass')).toHaveCount(0);
+  await expect(page.locator('.ready__standing')).toContainText('Noch 2 im Rennen');
+
+  // Runde 2 entscheidet das Turnier: einer bleibt stehen und verteilt den ganzen Topf.
+  await startShow(page);
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: ARENA_TIMEOUT });
+  await expect(page.locator('.result__crown')).toBeVisible();
+  await expect(page.locator('.result__sub')).toContainText('verteilt');
+
+  /*
+   * Und danach treten wieder alle drei an — vorher blieben Ausgeschiedene fuer immer
+   * markiert, und bei einem Verbliebenen war "Naechste Runde" ausgegraut (ADR-54).
+   */
+  const next = page.getByRole('button', { name: 'Nächste Runde' });
+  await expect(next).toBeEnabled();
+  await next.click();
+  await expect(page.locator('.screen--pass')).toBeVisible();
+  await expect(page.locator('.pass__position')).toContainText('von 3');
 });

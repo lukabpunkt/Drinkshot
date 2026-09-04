@@ -268,14 +268,19 @@ fsm.subscribe(({ to, event }) => {
 const GUARDED: ReadonlySet<GameState> = new Set<GameState>(['PASS', 'BET', 'READY', 'ARENA']);
 
 /*
- * Wieviele eigene History-Einträge wir gerade halten.
+ * Der Zurück-Knopf.
+ *
+ * Modell: **Ausserhalb des Titels hält die App genau einen eigenen History-Eintrag.**
+ * Ein Zurück verbraucht ihn, und `popstate` entscheidet, was das bedeutet — in einer
+ * laufenden Runde eine Nachfrage, sonst ein Schritt zurück.
  *
  * Vorher war das ein Boolean, und die Einträge leckten: Beim Verlassen eines geschützten
  * States wurde nur das Flag gelöscht, der Eintrag blieb im Stack — und jedes
- * "Weiterspielen" legte einen weiteren obendrauf. In der Lobby verpufften Zurück-Drücke
- * dann sichtbar folgenlos, die App wirkte eingefroren.
+ * "Weiterspielen" legte einen weiteren obendrauf. In der Lobby verpuffte der erste
+ * Zurück-Druck dann sichtbar folgenlos, die App wirkte eingefroren.
  */
 let guardDepth = 0;
+/** Wieviele `popstate`-Ereignisse noch von unserem eigenen Aufräumen stammen. */
 let unwinding = 0;
 let dialogOpen = false;
 
@@ -284,19 +289,22 @@ function pushGuard(): void {
   guardDepth += 1;
 }
 
+/** Gibt die überzähligen eigenen Einträge in einem Rutsch zurück. */
+function unwindTo(target: number): void {
+  const steps = guardDepth - target;
+  if (steps <= 0) return;
+  guardDepth = target;
+  unwinding += steps;
+  globalThis.history?.go(-steps);
+}
+
 function updateHistoryGuard(state: GameState): void {
-  if (GUARDED.has(state)) {
-    if (guardDepth === 0) pushGuard();
+  if (state === 'TITLE') {
+    unwindTo(0);
     return;
   }
-  if (guardDepth === 0) return;
-
-  // Aufräumen: die eigenen Einträge in einem Rutsch zurückgeben. Die dadurch
-  // ausgelösten `popstate`-Ereignisse verschluckt der Zähler unten.
-  unwinding += guardDepth;
-  const depth = guardDepth;
-  guardDepth = 0;
-  globalThis.history?.go(-depth);
+  if (guardDepth === 0) pushGuard();
+  else unwindTo(1);
 }
 
 /** Fragt nach und bricht die laufende Runde ab. Auch die ✕-Knöpfe der Screens rufen das. */
@@ -326,10 +334,12 @@ globalThis.addEventListener('popstate', () => {
     return;
   }
 
+  // Der Eintrag ist verbraucht.
+  guardDepth = Math.max(0, guardDepth - 1);
   const state = fsm.state;
 
   if (GUARDED.has(state)) {
-    // Erst den Eintrag zurücklegen, damit wir stehen bleiben, während gefragt wird.
+    // Zurücklegen, damit wir stehen bleiben, während gefragt wird.
     if (!dialogOpen) pushGuard();
     requestAbortRound();
     return;

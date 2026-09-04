@@ -12,7 +12,14 @@
  * - Bei zwei Spielern gibt es mindestens vier Wechsel in der Panik-Phase.
  */
 
-import { CHOREO, CHOREO_FAIRNESS, phaseDurations, type PhaseId } from '@/config/choreo';
+import {
+  CASCADE,
+  CHOREO,
+  CHOREO_FAIRNESS,
+  PHASE_BUDGET,
+  phaseDurations,
+  type PhaseId,
+} from '@/config/choreo';
 import { DURATION_MS, type DurationPreset } from '@/config/rules';
 import { createSeededRng, type SeededRng } from './rng';
 import type { PlayerId } from './lottery';
@@ -25,6 +32,12 @@ export type Beat =
   | { t: number; type: 'lock'; target: PlayerId; holdMs: number }
   | { t: number; type: 'shot' }
   | { t: number; type: 'death'; deathId: DeathId; victim: PlayerId }
+  /**
+   * Showdown: Sammeln zwischen zwei Schuessen. Die Ueberlebenden stehen **explizit** im
+   * Beat — der Director darf sie nicht aus dem Zustand der Maennchen ableiten, denn eine
+   * Sequenz setzt `dead` erst an ihrem Ende, und bis dahin waere die Auskunft falsch.
+   */
+  | { t: number; type: 'regroup'; survivors: readonly PlayerId[]; holdMs: number }
   | { t: number; type: 'outro' };
 
 /** Beats, die das Reticle auf ein Ziel legen. */
@@ -46,6 +59,14 @@ export interface ChoreographyInput {
    * Jedes bekommt Ruck, Lock, Schuss und eigene Sequenz — aber keinen neuen Aufbau.
    */
   extraVictims?: readonly { victimId: PlayerId; deathId: DeathId }[];
+  /**
+   * Showdown: weitere Opfer, jedes mit **eigenem** Aufbau über die noch Lebenden.
+   *
+   * Bewusst ein anderes Feld als `extraVictims` — die zwei Dramaturgien sind verschieden.
+   * Double Tap ist ein Nachschlag ohne Aufbau; die Kaskade baut jedes Mal neu auf, immer
+   * länger, bis zum Duell. Beides gleichzeitig ergibt keinen Sinn und wird abgewiesen.
+   */
+  cascade?: readonly { victimId: PlayerId; deathId: DeathId }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -170,10 +191,6 @@ function balanceHolds(
     for (const beat of aimSlots) beat.holdMs = Math.max(1, Math.round(beat.holdMs * correction));
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Hauptfunktion                                                       */
-/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
 /* Segmente                                                            */
@@ -431,25 +448,152 @@ function buildSegment(plan: SegmentPlan, rng: SeededRng, t0: number): SegmentRes
 }
 
 /* ------------------------------------------------------------------ */
+/* Kaskade (Showdown)                                                  */
+/* ------------------------------------------------------------------ */
+
+interface CascadeBudgets {
+  opening: number;
+  /** Ein Eintrag je Montage-Segment, wachsend. */
+  montage: number[];
+  finale: number;
+}
+
+/**
+ * Verteilt die Zeit über die Segmente. Deterministisch, verbraucht **kein** RNG.
+ *
+ * Die Montage wächst geometrisch: Jedes Segment ist um `montageGrowth` länger als das
+ * davor. Das liest sich als Beschleunigung, obwohl es das Gegenteil ist — weil die
+ * Abstände zwischen den Schüssen grösser werden, wirkt jeder einzelne gewichtiger.
+ *
+ * `maxTotalMs` ist die Notbremse: Reisst die Runde das Budget, wird die **Montage**
+ * gestaucht. Das Finale nie — es ist der Grund, warum jemand den Modus spielt.
+ */
+function cascadeBudgets(preset: DurationPreset, kills: number): CascadeBudgets {
+  const base = DURATION_MS[preset];
+  let opening = Math.round(base * CASCADE.openingShare);
+  const finale = Math.round(base * CASCADE.finaleShare);
+
+  // Zwischen Auftakt und Finale liegen `kills - 2` Segmente.
+  const montageCount = Math.max(0, kills - 2);
+
+  // Geometrische Gewichte, auf das Montage-Budget normiert.
+  const weights: number[] = [];
+  for (let i = 0; i < montageCount; i++) weights.push(CASCADE.montageGrowth ** i);
+  const weightSum = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+
+  const montageBudget = base * CASCADE.montageShare;
+  let montage = weights.map((weight) =>
+    Math.round(
+      Math.min(
+        CASCADE.montageMaxMs,
+        Math.max(CASCADE.montageMinMs, (weight / weightSum) * montageBudget)
+      )
+    )
+  );
+
+  /*
+   * Notbremse, in zwei Stufen — das Finale wird **nie** gekürzt, es ist der Grund, warum
+   * jemand den Modus spielt.
+   *
+   * 1. Die Montage stauchen. Reicht das,
+   * 2. den Auftakt kürzen (bis auf die Hälfte). Bei acht Spielern auf „Lang" ist selbst
+   *    das nicht genug — dann läuft die Runde eben über die Grenze, weil Preset und
+   *    Spielerzahl beide bewusst gewählt wurden. Ehrlicher, als still ein Duell zu
+   *    beschneiden.
+   */
+  const overhead =
+    kills * CASCADE.regroupMs + (kills - 1) * CASCADE.deathHoldMs + CASCADE.finalDeathHoldMs;
+  const montageTotal = montage.reduce((sum, value) => sum + value, 0);
+  const minMontage = montageCount * CASCADE.montageMinMs;
+
+  let excess = opening + finale + overhead + montageTotal - CASCADE.maxTotalMs;
+  if (excess > 0 && montageTotal > minMontage) {
+    const room = Math.max(minMontage, montageTotal - excess);
+    const factor = room / montageTotal;
+    montage = montage.map((value) => Math.max(CASCADE.montageMinMs, Math.round(value * factor)));
+    excess = opening + finale + overhead + montage.reduce((sum, v) => sum + v, 0) - CASCADE.maxTotalMs;
+  }
+  if (excess > 0) {
+    opening = Math.max(Math.round(opening / 2), opening - excess);
+  }
+
+  return { opening, montage, finale };
+}
+
+/**
+ * Verteilt ein Segment-Budget auf die Phasen.
+ *
+ * Montage-Segmente bekommen **keinen** Scan: Bei 700 ms über fünf Spieler bliebe pro
+ * Ziel 140 ms, und `scope.aimAt` fährt dann in unter 100 ms — das Reticle teleportiert,
+ * statt zu suchen. Ein Montage-Segment ist reine Panik: ein bis drei harte Wechsel, dann
+ * die Klammer.
+ */
+function cascadePhases(
+  budgetMs: number,
+  kind: 'opening' | 'montage' | 'finale',
+  deathMs: number
+): Record<PhaseId, number> {
+  const body = Math.max(0, budgetMs - deathMs);
+
+  if (kind === 'montage') {
+    /*
+     * Kein Intro, kein Scan. Was bleibt, teilen sich Panik und Lock — und beide bekommen
+     * eine Untergrenze: Der Lock muss sichtbar zugehen (`lockClampMs` plus Reserve für
+     * die Drift), und mindestens ein Reticle-Wechsel muss lesbar sein. Sonst entstehen
+     * Beats von wenigen Millisekunden.
+     */
+    const minLock = CHOREO.lockClampMs + 250;
+    const minPanic = CASCADE.panicHoldMs[0];
+    const lock = Math.max(minLock, Math.min(body - minPanic, Math.round(body * 0.4)));
+    return { intro: 0, scan: 0, panic: Math.max(minPanic, body - lock), lock, death: deathMs };
+  }
+
+  // Auftakt und Finale folgen dem normalen Phasen-Verhältnis, nur ohne Todes-Anteil.
+  const share = PHASE_BUDGET.intro + PHASE_BUDGET.scan + PHASE_BUDGET.panic + PHASE_BUDGET.lock;
+  const scale = body / share;
+  const intro = kind === 'opening' ? Math.round(PHASE_BUDGET.intro * scale) : 0;
+  const scan = Math.round(PHASE_BUDGET.scan * scale);
+  const lock = Math.round(PHASE_BUDGET.lock * scale);
+  return { intro, scan, panic: Math.max(0, body - intro - scan - lock), lock, death: deathMs };
+}
+
+/* ------------------------------------------------------------------ */
 /* Hauptfunktion                                                       */
 /* ------------------------------------------------------------------ */
 
 export function buildShowScript(input: ChoreographyInput): ShowScript {
   const { players, victimId, seed, durationPreset, deathId } = input;
   const extraVictims = input.extraVictims ?? [];
+  const cascade = input.cascade ?? [];
 
   if (players.length === 0) throw new RangeError('buildShowScript: keine Spieler.');
   if (!players.includes(victimId)) {
     throw new RangeError(`buildShowScript: Opfer ${victimId} ist nicht in der Spielerliste.`);
   }
-  for (const extra of extraVictims) {
+  if (extraVictims.length > 0 && cascade.length > 0) {
+    throw new RangeError('buildShowScript: cascade und extraVictims schliessen sich aus.');
+  }
+
+  const followUps = [...extraVictims, ...cascade];
+  const seen = new Set<PlayerId>([victimId]);
+  for (const extra of followUps) {
     if (!players.includes(extra.victimId)) {
       throw new RangeError(`buildShowScript: Opfer ${extra.victimId} ist nicht in der Spielerliste.`);
     }
+    if (seen.has(extra.victimId)) {
+      throw new RangeError(`buildShowScript: Opfer ${extra.victimId} kommt doppelt vor.`);
+    }
+    seen.add(extra.victimId);
+  }
+  if (cascade.length > players.length - 2) {
+    // Einer muss stehen bleiben, sonst gibt es keinen Gewinner.
+    throw new RangeError('buildShowScript: die Kaskade laesst niemanden uebrig.');
   }
 
   const rng = createSeededRng(seed);
   const phases = phaseDurations(durationPreset);
+  const isCascade = cascade.length > 0;
+  const budgets = cascadeBudgets(durationPreset, cascade.length + 1);
 
   /* --- Der Aufbau: ein vollständiges Segment über alle Spieler --- */
   const opening = buildSegment(
@@ -457,9 +601,11 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
       players,
       victimId,
       deathId,
-      phases,
-      budgetMs: DURATION_MS[durationPreset],
-      fakeCount: CHOREO.fakeLocksByPreset[durationPreset],
+      phases: isCascade
+        ? cascadePhases(budgets.opening, 'opening', CASCADE.deathHoldMs)
+        : phases,
+      budgetMs: isCascade ? budgets.opening : DURATION_MS[durationPreset],
+      fakeCount: isCascade ? 1 : CHOREO.fakeLocksByPreset[durationPreset],
       scanBeats: undefined,
       panicHoldMs: CHOREO.panicHoldMs,
       minPanicBeats: players.length === 2 ? CHOREO_FAIRNESS.minPanicBeatsTwoPlayers : 0,
@@ -471,6 +617,7 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
 
   const beats: Beat[] = [...opening.beats];
   let t = opening.durationMs;
+  let previousTarget: PlayerId | undefined = opening.lastTarget;
 
   /*
    * Double Tap: Nachschlag ohne neuen Aufbau (GDD §4.2).
@@ -497,6 +644,46 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
     t += phases.death;
   }
 
+  /*
+   * Showdown: Jedes weitere Opfer bekommt ein **eigenes** Segment über die noch
+   * Lebenden — kurz in der Mitte, mit vollem Aufbau im Finale.
+   *
+   * Dass die Segmente eigene Spieler-Pools haben, ist nicht nur Kosmetik: Global
+   * gerechnet gäbe es bei n−1 Opfern genau einen Nicht-Opfer, und die Regel „der letzte
+   * Fake ist nie das Opfer" würde in jedem Segment den Gewinner verraten.
+   */
+  let alive = players.filter((player) => player !== victimId);
+  cascade.forEach((entry, index) => {
+    beats.push({ t, type: 'regroup', survivors: [...alive], holdMs: CASCADE.regroupMs });
+    t += CASCADE.regroupMs;
+
+    const isFinale = alive.length === 2;
+    const budget = isFinale ? budgets.finale : (budgets.montage[index] ?? CASCADE.montageMinMs);
+    const deathMs = isFinale ? CASCADE.finalDeathHoldMs : CASCADE.deathHoldMs;
+
+    const segment = buildSegment(
+      {
+        players: alive,
+        victimId: entry.victimId,
+        deathId: entry.deathId,
+        phases: cascadePhases(budget, isFinale ? 'finale' : 'montage', deathMs),
+        budgetMs: budget,
+        fakeCount: isFinale ? CHOREO.fakeLocksByPreset[durationPreset] : 0,
+        scanBeats: isFinale ? undefined : 0,
+        panicHoldMs: isFinale ? CHOREO.panicHoldMs : CASCADE.panicHoldMs,
+        minPanicBeats: isFinale ? CHOREO_FAIRNESS.minPanicBeatsTwoPlayers : 0,
+        previousTarget,
+      },
+      rng,
+      t
+    );
+
+    beats.push(...segment.beats);
+    t += segment.durationMs;
+    previousTarget = segment.lastTarget;
+    alive = alive.filter((player) => player !== entry.victimId);
+  });
+
   beats.push({ t, type: 'outro' });
 
   return { totalMs: t, beats };
@@ -505,6 +692,41 @@ export function buildShowScript(input: ChoreographyInput): ShowScript {
 /* ------------------------------------------------------------------ */
 /* Auswertung (Tests, Dev-Panel, Fairness-Audit)                       */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Zerlegt das Skript in seine Segmente, getrennt an den `regroup`-Beats.
+ *
+ * Ohne Kaskade ist das genau ein Segment — deshalb funktionieren die Auswertungen unten
+ * für alle Modi gleich.
+ */
+export function segmentsOf(script: ShowScript): Beat[][] {
+  const segments: Beat[][] = [[]];
+  for (const beat of script.beats) {
+    if (beat.type === 'regroup') {
+      segments.push([]);
+      continue;
+    }
+    segments[segments.length - 1]!.push(beat);
+  }
+  return segments;
+}
+
+/**
+ * Verweilzeit des Reticles je Spieler vor dem Lock **dieses** Segments.
+ *
+ * Bei der Kaskade ist die segmentweise Betrachtung die einzige sinnvolle: Ein Segment ist
+ * der Zeitraum, in dem ein Zuschauer überhaupt etwas vorhersagen könnte.
+ */
+export function dwellBeforeLockIn(beats: readonly Beat[]): Record<PlayerId, number> {
+  const dwell: Record<PlayerId, number> = {};
+  for (const beat of beats) {
+    if (beat.type === 'lock') break;
+    if (beat.type === 'aim' || beat.type === 'fakeLock') {
+      dwell[beat.target] = (dwell[beat.target] ?? 0) + beat.holdMs;
+    }
+  }
+  return dwell;
+}
 
 /** Beats, die ein Ziel anvisieren — in Reihenfolge. */
 export function targetedBeats(script: ShowScript): TargetedBeat[] {

@@ -102,6 +102,60 @@ export const CHOREO = {
 /* Fairness-Regeln (Architektur §5.3–§5.6, GDD §3.5)                   */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Showdown-Kaskade (GDD §3.6, Roadmap M5b)                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Timing der Kaskade: In einer Runde fallen n−1 Schuesse, bis einer steht.
+ *
+ * Die Kurve waechst **von unten nach oben**. Ein gleichmaessiger Nachschlag wie bei
+ * Double Tap waere hier falsch: Der erste Schuss von sechs ist kein Hoehepunkt, der
+ * letzte ist einer. Also kurzer Auftakt, dann eine Montage, die sich beschleunigt
+ * anfuehlt, weil jedes Segment ein Stueck laenger wird als das davor — und am Ende ein
+ * Duell mit vollem Aufbau, Scan, Panik und Fake-Locks.
+ *
+ * Alle Anteile beziehen sich auf `DURATION_MS[preset]`, also auf die Laenge einer
+ * normalen Runde.
+ */
+export const CASCADE = {
+  /** Auftakt: voller Aufbau, aber gekuerzt — das Ritual bleibt, die Laenge nicht. */
+  openingShare: 0.6,
+  /** Das finale Duell bekommt fast eine ganze Runde. */
+  finaleShare: 0.9,
+  /** Gesamtbudget aller Montage-Segmente dazwischen. */
+  montageShare: 0.7,
+  /** Jedes Montage-Segment ist um diesen Faktor laenger als das davor. */
+  montageGrowth: 1.45,
+  /**
+   * Kuerzestes Montage-Segment. Muss Tod (1200), Lock (mind. 450) und wenigstens einen
+   * sichtbaren Reticle-Wechsel (260) unterbringen — darunter entstehen Beats von wenigen
+   * Millisekunden, die niemand sieht.
+   */
+  montageMinMs: 2200,
+  /** Darueber waere es kein Montage-Schnitt mehr, sondern ein zweites Duell. */
+  montageMaxMs: 4200,
+
+  /** Sammeln nach jedem Tod: Klammern auf, Kamera raus, alle stieben auseinander. */
+  regroupMs: 500,
+  /**
+   * Was das *Skript* einem Zwischentod einraeumt. Die Sequenzen laufen real 2,6–4,5 s
+   * und ueberlappen bewusst mit dem naechsten Segment — sechs vollstaendig
+   * ausgespielte Tode hintereinander waeren eine Diashow.
+   */
+  deathHoldMs: 1200,
+  /** Der letzte Tod bekommt seine Zeit; danach kommt nur noch das Outro. */
+  finalDeathHoldMs: 2600,
+
+  /** Montage-Beats: kurz und hart. */
+  panicHoldMs: [260, 520] as const,
+  /** Wie schnell die Ueberlebenden je Segment zusaetzlich werden. */
+  panicSpeedStep: 0.1,
+
+  /** Notbremse: Laenger als das darf eine Runde nicht werden. */
+  maxTotalMs: 45_000,
+} as const;
+
 export const CHOREO_FAIRNESS = {
   /**
    * Das Opfer darf vor dem Lock nicht laenger anvisiert werden als 1/n + Toleranz

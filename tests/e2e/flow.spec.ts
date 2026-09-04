@@ -6,7 +6,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { ARENA_TIMEOUT, betAllAndStart, placeBet, tapPass } from './helpers';
+import { ARENA_TIMEOUT, betAllAndStart, enterLobby, placeBet, tapPass } from './helpers';
 
 const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
 
@@ -44,13 +44,8 @@ async function freshStart(page: Page): Promise<void> {
 }
 
 async function setUpLobby(page: Page, names: string[]): Promise<void> {
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  await expect(page.locator('.screen--lobby')).toBeVisible();
-
-  const addButton = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < names.length) {
-    await addButton.click();
-  }
+  // Zählt erst, wenn die Lobby ihre Startspieler angelegt hat — siehe `enterLobby`.
+  await enterLobby(page, names.length);
 
   const inputs = page.locator('.lobby__name');
   for (const [index, name] of names.entries()) {

@@ -35,13 +35,26 @@ export async function prepare(page: Page, settings?: Record<string, unknown>): P
   );
 }
 
-/** Titel → Lobby → gewünschte Spielerzahl → „Los geht's!". */
+/**
+ * Titel → Lobby → gewünschte Spielerzahl.
+ *
+ * Der Screen legt seine Startspieler erst in `activate()` an — also **nach** dem Wipe.
+ * Wer vorher zählt, sieht null Zeilen, klickt „Spieler hinzufügen" und bekommt kurz
+ * darauf die Startspieler obendrauf: Aus zwei gewünschten werden drei. Auf einem
+ * schnellen Rechner fällt das nie auf, auf einem ausgelasteten CI-Runner jedes Mal.
+ *
+ * Deshalb zuerst abwarten, dass die Lobby ihre Zeilen hat — und am Ende die Zahl
+ * zusichern, damit ein Fehler hier auffliegt und nicht erst drei Screens später.
+ */
 export async function enterLobby(page: Page, players: number): Promise<void> {
   await page.getByRole('button', { name: 'Spielen' }).click();
   await expect(page.locator('.screen--lobby')).toBeVisible();
+  await expect(page.locator('.lobby__row')).not.toHaveCount(0);
 
   const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
   while ((await page.locator('.lobby__row').count()) < players) await add.click();
+
+  await expect(page.locator('.lobby__row')).toHaveCount(players);
 }
 
 /** Wartet die 800-ms-Sperre ab und tippt den Privacy-Screen an. */

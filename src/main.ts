@@ -248,6 +248,9 @@ fsm.on('PASS', { enter: preloadAtlases });
 fsm.on('READY', { enter: preloadAtlases });
 
 fsm.subscribe(({ to, event }) => {
+  // Jedes "Los geht's!" beginnt ein neues Turnier — frueheres Ausscheiden zaehlt nicht mehr.
+  if (event.type === 'begin') session.startTournament();
+
   void router.go(SCREEN_FOR_STATE[to], {
     direction: BACK_EVENTS.has(event.type) ? 'back' : 'forward',
     color: wipeColor(to),

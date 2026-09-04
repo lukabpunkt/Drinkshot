@@ -11,6 +11,7 @@ import {
   MAX_PLAYERS,
   MAX_ROUND_HISTORY,
   MIN_PLAYERS,
+  MODE_SPECS,
   victimCount,
   STORAGE_KEY,
   type DurationPreset,
@@ -53,6 +54,15 @@ export interface RoundSetup {
   extraDeaths: { deathId: DeathId; zone: DeathZone }[];
   mode: GameMode;
   durationPreset: DurationPreset;
+  /**
+   * Der Topf des **Turniers**, nicht der Runde.
+   *
+   * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen (ADR-53).
+   * `bets` schrumpft dabei mit dem Teilnehmerfeld — was der Letzte verteilt, ist aber die
+   * Summe **aller** urspruenglichen Einsaetze. Ausserhalb eines Turniers ist das genau
+   * `totalSips(bets)`.
+   */
+  potSips: number;
 }
 
 export interface Drinker {
@@ -76,6 +86,15 @@ export interface Session {
   players: Player[];
   rounds: RoundResult[];
   settings: Settings;
+  /**
+   * Zeitstempel, ab dem die Runden-History zum laufenden Turnier zaehlt.
+   *
+   * Wird bei jedem `begin` neu gesetzt. `eliminatedPlayerIds` sieht nur juengere Runden an —
+   * so holt ein neues Spiel die Ausgeschiedenen zurueck, ohne das Scoreboard des Abends zu
+   * verlieren (ADR-54). Ein Zeitstempel statt eines Index, weil die History bei
+   * `MAX_ROUND_HISTORY` vorne abgeschnitten wird.
+   */
+  tournamentFrom: number;
 }
 
 /** Platzhalter, bis die Death-Registry in M3/M4 existiert. */
@@ -83,7 +102,7 @@ export const PLACEHOLDER_DEATH_ID: DeathId = 'basic_fall';
 export const PLACEHOLDER_DEATH_ZONE: DeathZone = 'body';
 
 export function createEmptySession(): Session {
-  return { players: [], rounds: [], settings: { ...DEFAULT_SETTINGS } };
+  return { players: [], rounds: [], settings: { ...DEFAULT_SETTINGS }, tournamentFrom: 0 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,7 +144,8 @@ export function createRoundSetup(
   bets: readonly Bet[],
   mode: GameMode,
   durationPreset: DurationPreset,
-  chooseDeath?: ChooseDeath
+  chooseDeath?: ChooseDeath,
+  potSips?: number
 ): RoundSetup {
   const victims = pickVictims(bets, victimCount(mode, bets.length));
   const seed = createSeed();
@@ -158,6 +178,7 @@ export function createRoundSetup(
     extraDeaths: victims.slice(1).map((_, index) => draw(index + 1)),
     mode,
     durationPreset,
+    potSips: potSips ?? totalSips(bets),
   };
 }
 
@@ -266,7 +287,8 @@ export function resolveRound(setup: RoundSetup, finishedAt = Date.now()): RoundR
       };
       if (survivors.length === 1) {
         result.winnerId = survivors[0]!;
-        result.sipsToDistribute = totalSips(setup.bets);
+        // Der Topf des ganzen Turniers, nicht nur der beiden Finalisten (ADR-53).
+        result.sipsToDistribute = setup.potSips;
       }
       return result;
     }
@@ -289,11 +311,31 @@ export function scoreboard(session: Session): Record<PlayerId, number> {
   return totals;
 }
 
-/** Im Modus "Sudden Death" ausgeschiedene Spieler — aus der Runden-History abgeleitet. */
+/**
+ * Im Modus "Sudden Death" ausgeschiedene Spieler — aus der Runden-History abgeleitet.
+ *
+ * Nur das **laufende Turnier** zaehlt. Zwei Grenzen ziehen es ein (ADR-54):
+ *
+ * 1. `session.tournamentFrom` — bei jedem `begin` neu gesetzt. Wer mitten im Turnier in die
+ *    Lobby geht und neu startet, faengt mit vollem Feld an.
+ * 2. Rueckwaerts bis zur letzten entschiedenen Runde (`winnerId`) oder bis zu einer Runde
+ *    eines Modus, der gar nicht ausscheiden laesst. Ist das Turnier durch, treten in der
+ *    naechsten Runde wieder alle an — ohne Knopf, ohne Verlust des Scoreboards.
+ */
 export function eliminatedPlayerIds(session: Session): Set<PlayerId> {
+  const since = session.tournamentFrom ?? 0;
+  const rounds = session.rounds.filter((round) => round.finishedAt > since);
+
+  let start = rounds.length;
+  while (start > 0) {
+    const round = rounds[start - 1]!;
+    if (round.winnerId !== undefined || !MODE_SPECS[round.mode]?.eliminates) break;
+    start -= 1;
+  }
+
   const out = new Set<PlayerId>();
-  for (const round of session.rounds) {
-    for (const id of round.eliminatedIds) out.add(id);
+  for (let i = start; i < rounds.length; i += 1) {
+    for (const id of rounds[i]!.eliminatedIds) out.add(id);
   }
   return out;
 }
@@ -326,6 +368,38 @@ function sanitizePlayers(raw: unknown): Player[] {
   return players;
 }
 
+/**
+ * Haelt fremde oder veraltete Runden aus dem Speicher vom Rest der App fern.
+ *
+ * Ohne das reicht ein einziger Eintrag ohne `eliminatedIds`, um beim Rendern der Lobby zu
+ * werfen — und die App startet bis zum Loeschen des Speichers nicht mehr. Runden ohne
+ * bekannten Modus fliegen raus, alles andere wird aufgefuellt.
+ */
+function sanitizeRounds(rounds: unknown): RoundResult[] {
+  if (!Array.isArray(rounds)) return [];
+  const out: RoundResult[] = [];
+  for (const raw of rounds) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const round = raw as Partial<RoundResult>;
+    if (typeof round.mode !== 'string' || !(round.mode in MODE_SPECS)) continue;
+
+    const bets = Array.isArray(round.bets) ? round.bets : [];
+    out.push({
+      ...(round as RoundResult),
+      bets,
+      drinkers: Array.isArray(round.drinkers) ? round.drinkers : [],
+      eliminatedIds: Array.isArray(round.eliminatedIds) ? round.eliminatedIds : [],
+      extraVictimIds: Array.isArray(round.extraVictimIds) ? round.extraVictimIds : [],
+      extraDeaths: Array.isArray(round.extraDeaths) ? round.extraDeaths : [],
+      odds: typeof round.odds === 'object' && round.odds !== null ? round.odds : {},
+      finishedAt: typeof round.finishedAt === 'number' ? round.finishedAt : 0,
+      // Vor ADR-53 gab es kein `potSips` — der Rundeneinsatz ist dort die richtige Antwort.
+      potSips: typeof round.potSips === 'number' ? round.potSips : totalSips(bets),
+    });
+  }
+  return out;
+}
+
 export function loadSession(storage: Storage | undefined = globalThis.localStorage): Session {
   const fallback = createEmptySession();
   if (!storage) return fallback;
@@ -335,8 +409,9 @@ export function loadSession(storage: Storage | undefined = globalThis.localStora
     const parsed = JSON.parse(raw) as Partial<Session>;
     return {
       players: sanitizePlayers(parsed.players),
-      rounds: Array.isArray(parsed.rounds) ? parsed.rounds.slice(-MAX_ROUND_HISTORY) : [],
+      rounds: sanitizeRounds(parsed.rounds).slice(-MAX_ROUND_HISTORY),
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      tournamentFrom: typeof parsed.tournamentFrom === 'number' ? parsed.tournamentFrom : 0,
     };
   } catch {
     return fallback;
@@ -379,8 +454,11 @@ export interface SessionStore {
   playerById(id: PlayerId): Player | undefined;
   canStart(): boolean;
 
-  /** Runden und Ausscheiden zuruecksetzen; Spieler und Settings bleiben. */
-  resetRounds(): void;
+  /**
+   * Zieht die Turniergrenze neu — ab jetzt zaehlt kein frueheres Ausscheiden mehr.
+   * Laeuft bei jedem `begin`. Runden und Scoreboard bleiben unangetastet (ADR-54).
+   */
+  startTournament(): void;
   /** Alles zurueck auf Werkszustand. */
   reset(): void;
 }
@@ -473,8 +551,8 @@ export function createSessionStore(
       return activePlayers(store.get()).length >= MIN_PLAYERS;
     },
 
-    resetRounds() {
-      commit({ rounds: [] });
+    startTournament() {
+      commit({ tournamentFrom: Date.now() });
     },
 
     reset() {

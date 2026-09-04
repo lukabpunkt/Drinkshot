@@ -21,6 +21,7 @@ function fakeDraw(bets: readonly Bet[]): RoundSetup {
     zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
+    potSips: bets.reduce((sum, bet) => sum + bet.sips, 0),
   };
 }
 

@@ -39,6 +39,7 @@ function setup(overrides: Partial<RoundSetup> = {}): RoundSetup {
     zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
+    potSips: BETS.reduce((sum, bet) => sum + bet.sips, 0),
     ...overrides,
   };
 }
@@ -230,7 +231,10 @@ describe('Persistenz', () => {
 
   it('kappt die Runden-History bei 50 Eintraegen', () => {
     const session = createEmptySession();
-    session.rounds = Array.from({ length: 60 }, (_, i) => ({ finishedAt: i }) as RoundResult);
+    session.rounds = Array.from(
+      { length: 60 },
+      (_, i) => ({ ...setup(), finishedAt: i + 1, drinkers: [], eliminatedIds: [], odds: {} })
+    ) as RoundResult[];
     saveSession(session);
     expect(loadSession().rounds).toHaveLength(MAX_ROUND_HISTORY);
   });
@@ -324,24 +328,71 @@ describe('SessionStore', () => {
     expect(store.canStart()).toBe(true);
   });
 
-  it('schliesst Ausgeschiedene von activePlayers aus', () => {
+  it('schliesst Ausgeschiedene waehrend des Turniers von activePlayers aus', () => {
     const store = createSessionStore(createEmptySession());
     const a = store.addPlayer(nameFor)!;
     const b = store.addPlayer(nameFor)!;
-    store.recordRound(
-      resolveRound(
-        setup({
-          mode: 'suddenDeath',
-          bets: [
-            { playerId: a.id, sips: 1 },
-            { playerId: b.id, sips: 2 },
-          ],
-          victimId: b.id,
-        })
-      )
+    const c = store.addPlayer(nameFor)!;
+    const bets = [a, b, c].map((player, i) => ({ playerId: player.id, sips: i + 1 }));
+    // Drei Spieler, einer faellt: das Turnier laeuft noch, also bleibt er draussen.
+    store.recordRound(resolveRound(setup({ mode: 'suddenDeath', bets, victimId: c.id })));
+    expect(store.activePlayers().map((player) => player.id)).toEqual([a.id, b.id]);
+    expect(store.canStart()).toBe(true);
+  });
+
+  it('holt nach dem entschiedenen Turnier alle zurueck', () => {
+    const store = createSessionStore(createEmptySession());
+    const a = store.addPlayer(nameFor)!;
+    const b = store.addPlayer(nameFor)!;
+    const c = store.addPlayer(nameFor)!;
+    const all = [a, b, c].map((player, i) => ({ playerId: player.id, sips: i + 1 }));
+
+    store.recordRound(resolveRound(setup({ mode: 'suddenDeath', bets: all, victimId: c.id })));
+    const finale = resolveRound(
+      setup({ mode: 'suddenDeath', bets: all.slice(0, 2), victimId: b.id, potSips: 6 })
     );
-    expect(store.activePlayers().map((player) => player.id)).toEqual([a.id]);
-    expect(store.canStart()).toBe(false);
+    expect(finale.winnerId).toBe(a.id);
+    // Der Letzte verteilt den Topf des Turniers, nicht nur den der Schlussrunde (ADR-53).
+    expect(finale.sipsToDistribute).toBe(6);
+
+    store.recordRound(finale);
+    expect(store.activePlayers()).toHaveLength(3);
+    expect(store.canStart()).toBe(true);
+  });
+
+  it('startTournament laesst frueheres Ausscheiden verfallen', () => {
+    const store = createSessionStore(createEmptySession());
+    const a = store.addPlayer(nameFor)!;
+    const b = store.addPlayer(nameFor)!;
+    const c = store.addPlayer(nameFor)!;
+    const bets = [a, b, c].map((player, i) => ({ playerId: player.id, sips: i + 1 }));
+    store.recordRound(
+      resolveRound(setup({ mode: 'suddenDeath', bets, victimId: c.id }), Date.now() - 1000)
+    );
+    expect(store.activePlayers()).toHaveLength(2);
+
+    store.startTournament();
+    expect(store.activePlayers()).toHaveLength(3);
+  });
+
+  it('ueberlebt Runden ohne eliminatedIds im Speicher', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        players: [{ id: 'p1', name: 'Anna', colorId: 'red' }],
+        rounds: [
+          { mode: 'suddenDeath', finishedAt: 1, bets: [{ playerId: 'p1', sips: 2 }] },
+          { finishedAt: 2 },
+          { mode: 'gibtsnicht', finishedAt: 3 },
+        ],
+      })
+    );
+    const session = loadSession();
+    // Nur die Runde mit bekanntem Modus ueberlebt — und sie hat wieder alle Felder.
+    expect(session.rounds).toHaveLength(1);
+    expect(session.rounds[0]!.eliminatedIds).toEqual([]);
+    expect(session.rounds[0]!.potSips).toBe(2);
+    expect(() => eliminatedPlayerIds(session)).not.toThrow();
   });
 
   it('benachrichtigt Subscriber', () => {
@@ -355,12 +406,14 @@ describe('SessionStore', () => {
     expect(calls).toBe(1);
   });
 
-  it('resetRounds behaelt Spieler, reset raeumt alles ab', () => {
+  it('startTournament zieht die Grenze, reset raeumt alles ab', () => {
     const store = createSessionStore(createEmptySession());
     store.addPlayer(nameFor);
     store.recordRound(resolveRound(setup()));
-    store.resetRounds();
-    expect(store.state.rounds).toEqual([]);
+    store.startTournament();
+    // Die History bleibt — nur das Ausscheiden davor zaehlt nicht mehr (ADR-54).
+    expect(store.state.rounds).toHaveLength(1);
+    expect(store.state.tournamentFrom).toBeGreaterThan(0);
     expect(store.state.players).toHaveLength(1);
 
     store.reset();

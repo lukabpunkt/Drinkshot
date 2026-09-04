@@ -129,7 +129,15 @@ export const MOTION = {
   /** Bottom-Sheet Slide-up (§4.5). */
   sheetMs: 260,
   sheetEase: 'cubic-bezier(.2,.9,.3,1.2)',
+
+  /** Result: Zahlen zaehlen hoch, Balken wachsen (Roadmap M5.3). */
+  countUpMs: 620,
+  /** Versatz zwischen zwei Scoreboard-Zeilen — die Tabelle baut sich von oben auf. */
+  staggerMs: 70,
 } as const;
+
+/** Alias fuer die DOM-Helfer in `ui/animate.ts` — dieselben Werte, sprechender Name. */
+export const UI_TIMING = MOTION;
 
 /* ------------------------------------------------------------------ */
 /* Animations-Konstanten fuer Tode (Art Direction §5.2)                */

@@ -151,7 +151,9 @@
   },
   "error": {
     "generic": "Da ist was schiefgelaufen.",
-    "retry": "Nochmal versuchen"
+    "retry": "Nochmal versuchen",
+    "assets": "Grafiken konnten nicht geladen werden.",
+    "webgl": "Dein Browser kann die Arena nicht anzeigen. Das Ergebnis steht trotzdem."
   },
   "deaths": {
     "notYet": "Noch nicht!",

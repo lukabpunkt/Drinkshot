@@ -8,6 +8,11 @@
 export const HAPTIC_PATTERNS = {
   tap: 12,
   confirm: [12, 40, 18],
+  /**
+   * Ein Puls des Lock-Herzschlags. Bewusst kurz: Er läuft im Takt der Tonspur, und ein
+   * langes Brummen im 140er-Takt wäre keine Spannung mehr, sondern ein Dauerton (GDD §6).
+   */
+  lockPulse: [14, 90, 10],
   shot: 60,
   reveal: [40, 60, 40],
 } as const;

@@ -1455,3 +1455,9 @@
   font-size: 11px;
   cursor: pointer;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .score__bar::after {
+    transition: none;
+  }
+}

@@ -142,8 +142,12 @@ function createLazyArenaScreen(context: ScreenContext): ScreenInstance {
     .then(({ createArenaScreen }) => {
       if (disposed) return;
       inner = createArenaScreen(context);
+      const hadFocus = document.activeElement === el;
       el.replaceWith(inner.el);
       inner.el.dataset.screen = 'arena';
+      // Fokus mitnehmen, sonst fällt er beim Austausch ins Dokument zurück (Audit A5).
+      inner.el.tabIndex = -1;
+      if (hadFocus) inner.el.focus({ preventScroll: true });
       inner.activate?.();
     })
     .catch((error) => {

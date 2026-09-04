@@ -81,6 +81,16 @@ button {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * Der Screen-Container bekommt beim Wechsel den Fokus, damit Tab-Reihenfolge und
+ * Screenreader vorne anfangen (Audit A5). Er ist aber kein Bedienelement — ein Ring um
+ * den ganzen Bildschirm wäre nur Lärm.
+ */
+.screen:focus,
+.screen:focus-visible {
+  outline: none;
+}
+
 /* ------------------------------------------------------------------ */
 /* App-Root                                                            */
 /* ------------------------------------------------------------------ */

@@ -51,8 +51,26 @@ export interface RouterOptions {
   context: Omit<ScreenContext, 'router'>;
 }
 
-function prefersReducedMotion(): boolean {
-  return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+import { prefersReducedMotion } from '@/ui/animate';
+
+/**
+ * Setzt den Fokus auf den frisch gemounteten Screen (Audit A5).
+ *
+ * Ohne das bleibt der Fokus dort, wo der alte Screen war — nach dem Austausch also im
+ * Nichts, und die Tab-Reihenfolge beginnt wieder ganz oben beim Dokument. Ein Screenreader
+ * liest ausserdem nichts vor, weil sich für ihn nur DOM ausgetauscht hat.
+ *
+ * Der Container bekommt `tabindex="-1"`: fokussierbar per Skript, aber nicht per Tab —
+ * er soll die Reihenfolge anführen, nicht selbst eine Station sein. `preventScroll`, weil
+ * die Screens ohnehin bildschirmfüllend sind und ein Sprung nur ruckelt.
+ */
+function focusScreen(el: HTMLElement): void {
+  el.tabIndex = -1;
+  try {
+    el.focus({ preventScroll: true });
+  } catch {
+    el.focus();
+  }
 }
 
 /** Leitet die Richtung aus der Position in `SCREEN_ORDER` ab. */
@@ -81,6 +99,7 @@ export function createRouter(options: RouterOptions): Router {
     instance.el.dataset.screen = id;
     host.append(instance.el);
     current = id;
+    focusScreen(instance.el);
   };
 
   /**

@@ -7,6 +7,7 @@
 
 import gsap from 'gsap';
 import { ARENA, shotlingHeightFor } from '@/config/theme';
+import { HEARTBEAT } from '@/config/choreo';
 import { buildShowScript } from '@/core/choreographer';
 import { createSeededRng } from '@/core/rng';
 import { t } from '@/core/i18n';
@@ -42,6 +43,13 @@ import { createDevPanel, type DevPanel } from '@/ui/components/devPanel';
 
 /** Hüte, die sich zum Wegschiessen eignen. */
 const HATS_WITH_BRIM = ['cap', 'party', 'tophat', 'helmet', 'crown', 'beanie'] as const;
+
+/** Pause vor dem zweiten Ladeversuch — lang genug für eine wiederkehrende Verbindung. */
+const ASSET_RETRY_DELAY_MS = 600;
+/** Wie lange der Fehler-Toast steht, bevor die Runde ohne Show ins Result geht. */
+const ERROR_TOAST_MS = 6000;
+/** Abstand der Haptik-Pulse im Lock — dasselbe Tempo wie der Herzschlag am Ende. */
+const LOCK_PULSE_MS = Math.round(60_000 / HEARTBEAT.bpm[1]);
 
 /** `?dev=1&hold=1` hält die Arena offen, damit `perf.spec.ts` messen kann. */
 function isHoldMode(dev: boolean): boolean {
@@ -139,6 +147,29 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   /* ------------------------------------------------------------------ */
 
   let disposed = false;
+  /** Notausgang ins Result, wenn die Arena nicht aufgebaut werden konnte. */
+  let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Herzschlag-Puls der Haptik während des Locks. */
+  let lockPulseTimer: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Vibriert im Takt des Lock-Herzschlags (GDD §3.5, Roadmap M5.4).
+   *
+   * Eigener Timer statt Mitlaufen am Ton: Die Haptik soll auch bei stumm geschaltetem
+   * Gerät spürbar sein — genau dann trägt sie die Spannung allein. Der Puls stoppt mit
+   * dem Schuss, nicht am Ende des Locks: Der Schuss ist der Moment, in dem er aufhören
+   * *muss*, sonst vibriert es in den Tod hinein.
+   */
+  function startLockPulse(): void {
+    stopLockPulse();
+    vibrate('lockPulse');
+    lockPulseTimer = globalThis.setInterval(() => vibrate('lockPulse'), LOCK_PULSE_MS);
+  }
+
+  function stopLockPulse(): void {
+    if (lockPulseTimer !== undefined) globalThis.clearInterval(lockPulseTimer);
+    lockPulseTimer = undefined;
+  }
   let finished = false;
   let handle: ArenaAppHandle | undefined;
   let director: ShowDirector | undefined;
@@ -162,22 +193,73 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     finish();
   });
 
+  /**
+   * Ein Ladeversuch darf an einem abgerissenen WLAN nicht die Runde kosten. Ein zweiter
+   * Versuch nach kurzer Pause holt genau den Fall zurück, in dem die erste Anfrage
+   * unterwegs verloren ging; scheitert auch der, entscheidet der Mensch (Roadmap M5.9).
+   */
+  async function loadAssetsWithRetry(): Promise<Awaited<ReturnType<typeof loadArenaAssets>>> {
+    try {
+      return await loadArenaAssets();
+    } catch (first) {
+      console.warn('[arena] Atlas-Ladefehler, zweiter Versuch', first);
+      await new Promise((resolve) => globalThis.setTimeout(resolve, ASSET_RETRY_DELAY_MS));
+      if (disposed) throw first;
+      return await loadArenaAssets();
+    }
+  }
+
+  /**
+   * Meldet einen Fehler und bietet einen zweiten Anlauf an.
+   *
+   * Ohne den Knopf bliebe nur „neu laden" — und damit wäre die Session weg. Wer ablehnt
+   * (oder nichts tut), landet nach kurzer Zeit im Result: Das Ergebnis steht ohnehin fest,
+   * gezogen wurde beim Übergang BET→ARENA. Nur die Show fällt aus.
+   */
+  function failGracefully(message: string, error: unknown, retry: boolean): void {
+    console.error('[arena]', message, error);
+    showToast(t(message), {
+      variant: 'danger',
+      durationMs: ERROR_TOAST_MS,
+      ...(retry
+        ? {
+            action: {
+              label: t('error.retry'),
+              onClick: () => {
+                if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
+                el.classList.add('is-loading');
+                void build().then(() => el.classList.remove('is-loading'));
+              },
+            },
+          }
+        : {}),
+    });
+    fallbackTimer = globalThis.setTimeout(finish, ERROR_TOAST_MS);
+  }
+
   async function build(): Promise<void> {
     let assets;
     try {
-      assets = await loadArenaAssets();
+      assets = await loadAssetsWithRetry();
     } catch (error) {
       // Ein Atlas-Fehler darf die Runde nicht kosten — das Ergebnis steht ohnehin fest.
-      console.error('[arena] Atlas konnte nicht geladen werden', error);
-      showToast(t('error.generic'), { variant: 'danger' });
-      globalThis.setTimeout(finish, 1200);
+      failGracefully('error.assets', error, true);
       return;
     }
     if (disposed) return;
 
     registerAllDeaths();
 
-    handle = await getArenaApp();
+    try {
+      handle = await getArenaApp();
+    } catch (error) {
+      /*
+       * Kein WebGL — alter Browser, deaktivierte Hardwarebeschleunigung, Software-Blocklist.
+       * Ein zweiter Versuch würde daran nichts ändern, deshalb kein Retry-Knopf.
+       */
+      failGracefully('error.webgl', error, false);
+      return;
+    }
     if (disposed) return;
 
     handle.clearWorld();
@@ -322,10 +404,12 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
         if (!isHoldMode(ctx.dev)) finish();
       },
       onShotFired: () => {
+        stopLockPulse();
         vibrate('shot');
         skip.hidden = false;
         lockLabel.hidden = true;
       },
+      onLockEngaged: startLockPulse,
     });
 
     // LOCK-Schriftzug einblenden, wenn der Lock-Beat kommt.
@@ -430,6 +514,8 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     },
     destroy() {
       disposed = true;
+      stopLockPulse();
+      if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
       if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
       releaseWakeLock?.();
       offLayout?.();

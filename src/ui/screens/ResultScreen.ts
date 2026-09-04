@@ -7,10 +7,11 @@
  */
 
 import { MIN_PLAYERS } from '@/config/rules';
-import { colorById, hex, UI_COLORS } from '@/config/theme';
+import { colorById, hex, MOTION, UI_COLORS } from '@/config/theme';
 import { plural, t } from '@/core/i18n';
 import * as audio from '@/audio/AudioManager';
 import type { RoundResult } from '@/core/session';
+import { countUp, growBar, prefersReducedMotion } from '@/ui/animate';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { createButton } from '@/ui/components/button';
 import { vibrate } from '@/ui/haptics';
@@ -80,6 +81,12 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
   el.style.setProperty('--result-color', hex(isMiracle ? UI_COLORS.accent : victimColor.hex));
   if (isMiracle) el.classList.add('screen--result-miracle');
 
+  /*
+   * Alle laufenden Zähler und Balken. Verlässt man den Screen mitten im Hochzählen,
+   * würden sonst verwaiste `requestAnimationFrame`-Schleifen weiterlaufen.
+   */
+  const cancels: (() => void)[] = [];
+
   const confetti = document.createElement('div');
   confetti.className = 'result__confetti';
   confetti.setAttribute('aria-hidden', 'true');
@@ -87,6 +94,14 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
   /* --- Reveal --- */
   const reveal = document.createElement('div');
   reveal.className = 'result__reveal';
+  /*
+   * Zone, Kopfzeile und Unterzeile gehören zusammen — „Kopfschuss! Anna trinkt 3 Schlucke."
+   * Steht `aria-live` nur auf der Kopfzeile, fehlt der Treffer und bei Double Tap das
+   * zweite Opfer. `role="status"` liefert die Rolle für Browser ohne `aria-live`-Mapping.
+   */
+  reveal.setAttribute('role', 'status');
+  reveal.setAttribute('aria-live', 'polite');
+  reveal.setAttribute('aria-atomic', 'true');
 
   const zone = document.createElement('p');
   zone.className = 'result__zone';
@@ -108,7 +123,6 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   const headline = document.createElement('h1');
   headline.className = 'result__headline';
-  headline.setAttribute('aria-live', 'polite');
   headline.textContent = headlineText(round, ctx);
 
   const sub = document.createElement('p');
@@ -126,10 +140,10 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
   const summary = document.createElement('summary');
   summary.className = 'result__summary';
   summary.textContent = t('result.allBets');
-  details.append(summary, createBetsTable(round, ctx));
+  details.append(summary, createBetsTable(round, ctx, cancels));
 
   /* --- Scoreboard --- */
-  const scoreboard = createScoreboard(ctx);
+  const scoreboard = createScoreboard(ctx, cancels);
 
   /* --- Aktionen --- */
   const actions = document.createElement('div');
@@ -195,6 +209,9 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
         { duration: 420, easing: 'cubic-bezier(.34,1.56,.64,1)' }
       );
     },
+    destroy() {
+      for (const cancel of cancels) cancel();
+    },
   };
 }
 
@@ -248,7 +265,11 @@ function subText(round: RoundResult, ctx: ScreenContext): string {
   return '';
 }
 
-function createBetsTable(round: RoundResult, ctx: ScreenContext): HTMLElement {
+function createBetsTable(
+  round: RoundResult,
+  ctx: ScreenContext,
+  cancels: (() => void)[]
+): HTMLElement {
   const table = document.createElement('table');
   table.className = 'bets';
 
@@ -282,11 +303,17 @@ function createBetsTable(round: RoundResult, ctx: ScreenContext): HTMLElement {
 
     const betCell = document.createElement('td');
     betCell.className = 'bets__num';
-    betCell.textContent = String(bet.sips);
+    const delay = body.childElementCount * MOTION.staggerMs;
+    cancels.push(countUp(betCell, bet.sips, { delayMs: delay }));
 
     const chanceCell = document.createElement('td');
     chanceCell.className = 'bets__num';
-    chanceCell.textContent = `${Math.round((round.odds[bet.playerId] ?? 0) * 100)} %`;
+    cancels.push(
+      countUp(chanceCell, Math.round((round.odds[bet.playerId] ?? 0) * 100), {
+        delayMs: delay,
+        format: (n) => `${n} %`,
+      })
+    );
 
     row.append(nameCell, betCell, chanceCell);
     body.append(row);
@@ -296,7 +323,7 @@ function createBetsTable(round: RoundResult, ctx: ScreenContext): HTMLElement {
   return table;
 }
 
-function createScoreboard(ctx: ScreenContext): HTMLElement {
+function createScoreboard(ctx: ScreenContext, cancels: (() => void)[]): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'score';
 
@@ -308,7 +335,7 @@ function createScoreboard(ctx: ScreenContext): HTMLElement {
   const totals = ctx.session.scoreboard();
   const max = Math.max(1, ...Object.values(totals));
 
-  for (const player of ctx.session.state.players) {
+  ctx.session.state.players.forEach((player, index) => {
     const total = totals[player.id] ?? 0;
     const row = document.createElement('div');
     row.className = 'score__row';
@@ -317,25 +344,27 @@ function createScoreboard(ctx: ScreenContext): HTMLElement {
     name.className = 'score__name';
     name.textContent = player.name;
 
+    const delay = index * MOTION.staggerMs;
+
     const bar = document.createElement('span');
     bar.className = 'score__bar';
     bar.style.setProperty('--score-color', hex(colorById(player.colorId).hex));
-    bar.style.setProperty('--score-fill', `${(total / max) * 100}%`);
+    growBar(bar, (total / max) * 100, delay);
 
     const value = document.createElement('span');
     value.className = 'score__value';
-    value.textContent = String(total);
+    cancels.push(countUp(value, total, { delayMs: delay }));
 
     row.append(name, bar, value);
     wrapper.append(row);
-  }
+  });
 
   return wrapper;
 }
 
 /** CSS-Konfetti in der Farbe des Opfers, beim Wunder in Gold (GDD §6.5). */
 function spawnConfetti(host: HTMLElement, color: string, shade: string, count = CONFETTI_COUNT): void {
-  if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (prefersReducedMotion()) return;
   const fragment = document.createDocumentFragment();
   for (let index = 0; index < count; index++) {
     const piece = document.createElement('i');

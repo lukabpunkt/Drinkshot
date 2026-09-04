@@ -38,6 +38,11 @@ export interface ShowDirectorOptions {
   onFinished: () => void;
   /** Nach dem Schuss darf übersprungen werden (GDD §6.4). */
   onShotFired?: () => void;
+  /**
+   * Der Lock rastet ein. Die Haptik hängt sich hier ein — sie muss auch dann pulsieren,
+   * wenn der Ton aus ist, und darf deshalb nicht am Audio-Herzschlag hängen (Roadmap M5.4).
+   */
+  onLockEngaged?: (holdMs: number) => void;
 }
 
 /** Wie lange ein Männchen nach dem Reticle-Wechsel wegsprintet (Roadmap M3.6). */
@@ -190,6 +195,7 @@ export class ShowDirector {
               // sonst würde beides multipliziert (0.4 × 0.4).
               camera.slowMotion(CHOREO.slowMoScale);
               this.setPhaseSpeed(1);
+              this.options.onLockEngaged?.(holdMs);
             },
             undefined,
             at

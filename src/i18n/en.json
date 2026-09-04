@@ -151,7 +151,9 @@
   },
   "error": {
     "generic": "Something went wrong.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "assets": "Could not load the graphics.",
+    "webgl": "Your browser can't render the arena. The result stands anyway."
   },
   "deaths": {
     "notYet": "Not yet!",

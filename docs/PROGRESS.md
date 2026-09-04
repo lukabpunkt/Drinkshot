@@ -848,3 +848,114 @@ einen echten Fehler sichtbar gemacht (Nr. 6), den lokal nie einer gezeigt hätte
 - [ ] **Die Balance.** Du hast die Zahlen gesehen und dich für Konsistenz entschieden.
       Wenn im Playtest alle nur noch 1 setzen, steht die Pot-Variante in ADR-51 und ist
       eine kleine Änderung.
+
+---
+
+## Intro-Inszenierung — der Schütze, die Reihe, der Warnschuss (2026-09-04)
+
+Die Arena begann bisher damit, dass die Männchen einfach schon liefen. Das Intro war
+anderthalb Sekunden leere Zeit: ein Sound, ein Tempo, ein Fadenkreuz-Sprung — sonst nichts.
+
+Jetzt sieht man in der **ersten Runde einer Session** den Schützen von vorne, die Kamera
+fährt in sein Zielfernrohr, die Blende öffnet sich. Und in **jeder** Runde stehen die
+Männchen zuerst aufgereiht, bis ein Warnschuss vor ihren Füßen einschlägt und sie
+auseinanderstieben.
+
+### Die Regel, um die es ging
+
+Der naheliegende Weg — Shotling mit Gewehr, Lauf im Vordergrund der Ego-Sicht — verstößt
+gegen zwei ausdrückliche MUSS-Sätze:
+
+> „Nie brutal, nie realistisch. … **Kein Blut, kein Gewehr sichtbar.**"
+> — Art Direction §1
+>
+> „Keine echten Waffen-Darstellungen (**kein Gewehr-Modell sichtbar**, nur Scope-Overlay
+> + Flash)." — GDD §9, unter den **Nicht-Zielen**, neben „kein Backend" und „keine Ads"
+
+Das ist eine bewusste Produktentscheidung, keine Nachlässigkeit — und ein sichtbares
+Gewehr, das in Ego-Sicht auf Figuren zielt, wird bei Alterseinstufungen anders bewertet
+als ein abstraktes Fadenkreuz. Luka hat sich dagegen entschieden, sie zu ändern.
+
+Der Schütze steht deshalb **hinter der Linse**: Was auf den Betrachter zeigt, ist das
+Objektiv, zwei Stummelarme greifen den Ring von der Seite, darüber ein Chibi-Kopf mit
+Helm. Kein Schaft, kein Lauf, kein Zylinder darunter.
+
+Das ist nicht der Kompromiss, für den es sich anhört, sondern der stärkere Übergang: Man
+fährt **in sein Objektiv hinein** und wird der Schütze, statt nur seine Waffe zu sehen.
+Alle fünf Teile des Wunsches bleiben erhalten (ADR-52).
+
+### Ohne ein einziges neues Asset
+
+| Gebraucht | Woher |
+|---|---|
+| Der Schütze | Vier Sprites des schon geladenen Atlas, von Hand zusammengesetzt. **Kein `Shotling`** — der bräuchte eine Spielerfarbe (es gibt keine dunkle), ein `ShotlingBrain`, und trüge ein Farbsymbol auf der Brust, an das der Rig gar keinen Zugriff gibt |
+| Die Linse | `Graphics`. Als Sprite hätte sie `props@2x` von 2048×1024 auf 2048×2048 aufgebläht — und ein um 2,7 herangezoomtes Sprite wird weich |
+| Die Blende | Eine schrumpfende Scheibe |
+| Der Warnschuss | `dirtFountain` und `runDust` aus `fx/MuzzleFlash.ts` — `runDust` war seit M2 definiert und **wurde nie aufgerufen** |
+
+### Die Blende, umgedreht
+
+`CHOREO.introIrisMs = 900` stand seit M3 im Code und wurde von niemandem gelesen — den
+Iris-Wipe gab es nie, obwohl der Kommentar im Choreographer ihn versprach.
+
+Ihn als **wachsendes Loch** zu bauen (`cut()` oder even-odd) ginge nur, indem man jeden
+Frame `clear()` aufruft und die Geometrie neu tesselliert: Allokation im Loop, gegen
+Architektur §7.11 und den Heap-Test. Umgedreht ist es trivial — außerhalb des
+Sichtfensters ist der Scope ohnehin deckend, freizugeben ist nur die Linsenfläche. Eine
+gefüllte Scheibe schrumpft auf null, der Hintergrund blendet aus. Nur `scale` und `alpha`,
+keine Geometrie im Frame (ADR-54).
+
+### Die Reihe — nachgerechnet, nicht geschätzt
+
+Eine gerade Reihe passt bis sechs Spieler. Bei sieben bräuchte sie 688 Welteinheiten
+Spannweite; die Laufzone hat 702 Durchmesser, und der Requisiten-Ring beginnt bei 387.
+Ein Bogen rettet das nicht — damit er noch als Reihe liest (höchstens 75° Öffnung),
+bräuchte er Radius 589 statt 351.
+
+Ab sieben wird daraus deshalb ein **Klassenfoto aus zwei versetzten Reihen**. Die hinteren
+Köpfe stehen dabei mit drei Einheiten Luft über den vorderen — nachgerechnet und als Test
+festgehalten.
+
+Der Warnschuss geht **vor** die Füße des Äußersten, nicht seitlich neben die Reihe: Dort
+läge er bei sechs Spielern auf Radius 393, also mitten zwischen den Fässern.
+
+| Spieler | Reihen | größter Radius | Warnschuss |
+|---|---|---|---|
+| 2 | 1 | 78 | r = 176 |
+| 6 | 1 | 300 | r = 330 |
+| 8 | 2 | 197 | r = 279 |
+
+### Zwei Fehler, die schon vorher drin waren
+
+1. **`failGracefully` ließ den alten Ticker weiterlaufen.** Der zweite Anlauf nach einem
+   Ladefehler ruft `build()` erneut und überschrieb dabei `tickerFn` — die alte Funktion
+   blieb für immer im PIXI-Ticker, **zwei Simulationen liefen parallel** über dieselben
+   Männchen, und die Timelines des ersten Aufbaus liefen weiter, obwohl ihre Sprites
+   längst aus der Welt entfernt waren.
+2. **Der `visibilitychange`-Handler wurde zu spät registriert** — erst nach dem Aufbau des
+   Directors. Alles davor lief bei einem Tab-Wechsel ungebremst weiter, samt Ton.
+
+### Und einer, den ich selbst gemacht habe
+
+Ich hatte den Schützen mit `ink` getönt, damit er als Silhouette liest. Auf der fast
+schwarzen Scope-Vignette ergab das 1,11:1 — er war schlicht unsichtbar, und ich hielt den
+schwarzen Bildschirm zuerst für einen Fehler in der Blende. Jetzt gedämpftes Oliv
+(3,56:1). Dazu blieb der Scope während der Frontalansicht sichtbar, sein Fadenkreuz lag
+also über dem Gesicht des Schützen.
+
+### Zahlen
+
+| | |
+|---|---|
+| Unit-Tests | 436 (vorher 421) — neu: `introLineup` (11), `frozen` (4) |
+| Gemessen (E2E) | Runde 1: 16,5 s bis zum Schuss · Runde 2: 10,9 s |
+| Neue Assets | **keine** |
+| Übersprungen in | `?hold=1` und `?panel=deaths` — sonst brächen Draw-Call- und Filter-Test |
+
+**Manuelle Checks, die Luka bestätigen muss:**
+- [ ] **Trägt der Auftakt?** Drei Sekunden Schütze sind lang — zu lang, oder richtig?
+- [ ] **Liest sich die Linse als Fernrohr,** oder sieht es aus, als fehle etwas?
+- [ ] **Der Warnschuss:** Erschrickt man? Stieben sie überzeugend auseinander?
+- [ ] **Acht Spieler:** Die Aufstellung ist dann ein Klassenfoto aus zwei Reihen. Wirkt
+      das gewollt? (Geometrie ist getestet, das Aussehen nicht.)
+- [ ] **Mit „Bewegung reduzieren"** läuft nur der Kurzteil, ohne Kamerawackler.

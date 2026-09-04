@@ -650,6 +650,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       warningShot,
       lowEffects,
       reducedMotion: prefersReducedMotion(),
+      mode: introMode,
       onScatter: () => {
         for (const brain of brains) {
           brain.frozen = false;
@@ -665,7 +666,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       startShow();
     });
 
-    sequence.build(introMode).eventCallback('onComplete', startShow);
+    sequence.build().eventCallback('onComplete', startShow);
     sequence.play();
   }
 

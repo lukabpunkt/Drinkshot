@@ -307,7 +307,8 @@ interface DeathSequence extends DeathMeta {
 10. Budget pro Frame: Update ≤ 4 ms, Render ≤ 8 ms auf Referenzgerät (Pixel 4a).
 11. Keine Allokationen im Loop (keine Closures/Arrays pro Frame in `update()`); Vektoren wiederverwenden.
 12. Assets: Preload aller Arena-Assets **während der Betting-Phase** (die dauert ohnehin ≥ 10 s) mit `PIXI.Assets.backgroundLoad`.
-13. **Code-Splitting** (ADR-36): Der Arena-Screen — und mit ihm PIXI, GSAP, die Filter und alle
+13. **Der Auftakt laeuft ausserhalb des ShowScripts** (ADR-53): `IntroSequence` ist eine eigene GSAP-Timeline, die **vor** `director.play()` laeuft und dessen `onComplete` sie startet. Damit bleiben Choreographer, Fairness-Tests und `script.totalMs` unberuehrt. Sie wird **nicht** awaited — sonst haenge der Screen fuer ihre Dauer auf `is-loading`.
+14. **Code-Splitting** (ADR-36): Der Arena-Screen — und mit ihm PIXI, GSAP, die Filter und alle
     Todesanimationen — wird per `import()` nachgeladen und schon beim Betreten der **Lobby**
     vorgeladen. Der Einstieg laedt damit 21 statt 159 KB gzip. `main.ts` darf deshalb
     **nichts** aus `game/` statisch importieren ausser `deaths/catalog.ts` (das nichts

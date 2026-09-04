@@ -321,3 +321,56 @@ test('Showdown markiert niemanden in der Lobby als ausgeschieden', async ({ page
   await expect(page.locator('.lobby__row.is-eliminated')).toHaveCount(0);
   await expect(page.locator('.lobby__row')).toHaveCount(3);
 });
+
+test('Intro: die erste Runde bekommt den Auftakt, die zweite nur den Kurzteil', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+
+  await enterArena(page, '?dev=1', 2, { sound: false, duration: 'short' });
+
+  /*
+   * Gemessen wird bis zum Schuss (`.arena__skip`) — dasselbe Maß wie beim
+   * Dauer-Preset-Test. Der Auftakt liegt davor, also schlägt er voll durch.
+   */
+  const toShot = async (): Promise<number> => {
+    const started = Date.now();
+    await expect(page.locator('.arena__skip')).toBeVisible({ timeout: 90_000 });
+    return Date.now() - started;
+  };
+
+  const first = await toShot();
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole('button', { name: 'Nächste Runde' }).click();
+  await betAllAndStart(page, { players: 2 });
+  const second = await toShot();
+
+  console.log(`Runde 1 ${first} ms · Runde 2 ${second} ms (bis zum Schuss)`);
+
+  /*
+   * Der Unterschied ist der Schütze plus die Fahrt plus die Blende — gut fünf Sekunden.
+   * Grosszügig geprüft, weil beide Runden dieselbe Show-Länge haben und nur der Auftakt
+   * sich unterscheidet.
+   */
+  expect(first - second).toBeGreaterThan(3_000);
+  expect(first - second).toBeLessThan(9_000);
+});
+
+test('Intro: ein Tipp springt zur Show, nicht ins Ergebnis', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  await enterArena(page, '?dev=1', 3, { sound: false, duration: 'short' });
+
+  // Mitten in der Frontalansicht antippen.
+  await page.locator('.screen--arena').click({ position: { x: 100, y: 300 } });
+
+  /*
+   * Der Beleg, dass der Tipp die **Show** startet und nicht die Runde abkürzt: Das
+   * Ergebnis darf nicht sofort da sein, sondern erst nach der vollen Show.
+   */
+  await expect(page.locator('.screen--result')).toHaveCount(0);
+  await expect(page.locator('.arena__lock')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.screen--result')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.result__headline')).toContainText('trinkt');
+});

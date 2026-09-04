@@ -115,7 +115,9 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 
 | Phase      | Zeit (bei 15 s) | Was passiert                                                                                                                                                                                             |
 | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Intro**  | 0.0 – 1.5 s     | Schwarz → Scope-Blende öffnet sich (Iris-Wipe). Leichtes Atmen (Scope wobbelt). Alle Männchen sichtbar, laufen los.                                                                                      |
+| **Auftakt** | vor der Runde  | **Nur in der ersten Runde einer Session** (~6 s): Man sieht den Schützen von vorne — genauer sein Zielfernrohr, das einen anschaut, und dahinter einen Chibi-Kopf mit Helm. Die Kamera fährt in die Linse, die Blende öffnet sich. Ein Tipp überspringt. |
+| **Aufstellung** | jede Runde (~1,9 s) | Die Männchen stehen aufgereiht und rühren sich nicht — eine Reihe bis sechs Spieler, ab sieben zwei versetzte. Dann ein **Warnschuss** vor die Füße des Äußersten: Erdfontäne, Knall, und **erst jetzt** stieben sie auseinander. |
+| **Intro**  | 0.0 – 1.5 s     | Scope-Blende offen, leichtes Atmen (Scope wobbelt). Alle Männchen sichtbar, laufen.                                                                                      |
 | **Scan**   | 1.5 – 6.0 s     | Fadenkreuz gleitet weich von Männchen zu Männchen (jedes mind. 1×), Verweildauer 0.6–1.2 s. Beim Ankommen "Lock-Tick"-Sound + Reticle-Pulse.                                                             |
 | **Panik**  | 6.0 – 11.0 s    | Wechsel werden schneller (0.3–0.7 s), Männchen rennen schneller, Herzschlag-Sound setzt ein, Vignette pulsiert. 1–2 "Fakes": Reticle bleibt 1 s auf einem Nicht-Opfer, färbt sich fast rot, springt weg. |
 | **Lock**   | 11.0 – 13.5 s   | Reticle landet auf dem Opfer, färbt sich rot, "LOCKED"-Ticks, Scope zoomt 15 % rein, Zeit verlangsamt sich (Slow-Mo 0.4×), Herzschlag laut.                                                              |
@@ -285,7 +287,7 @@ Ziel: mindestens **12 unterschiedliche Tode** bis Release, damit selbst nach 20 
 - Kein Login, keine Accounts, kein Tracking.
 - Keine Ads, keine In-App-Käufe.
 - Kein 3D. 2D-Cartoon ist stilistisch stärker und performanter.
-- Keine echten Waffen-Darstellungen (kein Gewehr-Modell sichtbar, nur Scope-Overlay + Flash). Ton bleibt albern.
+- Keine echten Waffen-Darstellungen (kein Gewehr-Modell sichtbar, nur Scope-Overlay + Flash). Ton bleibt albern. **Gilt auch für den Auftakt (§3.5):** Der Schütze ist dort zwar zu sehen, aber hinter seinem Zielfernrohr — zwei Stummelarme greifen den Linsenring von der Seite. Kein Schaft, kein Lauf, kein Zylinder unter der Linse.
 
 ---
 

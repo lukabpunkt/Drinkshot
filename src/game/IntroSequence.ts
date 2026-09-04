@@ -42,6 +42,14 @@ export interface IntroSequenceOptions {
   lowEffects: boolean;
   /** Bei „Bewegung reduzieren": kein Push, keine Kamerawackler. */
   reducedMotion: boolean;
+  /**
+   * `full` zeigt den Schützen, `short` beginnt direkt bei der Reihe.
+   *
+   * Steht schon im Konstruktor, damit der Kurzteil den Schützen gar nicht erst baut —
+   * er läuft in **jeder** Runde ab der zweiten, und fünf Sprites plus zwei Graphics für
+   * etwas, das nie sichtbar wird, wären jedes Mal umsonst.
+   */
+  mode: IntroMode;
 }
 
 export type IntroMode = 'full' | 'short';
@@ -71,6 +79,15 @@ export class IntroSequence {
   constructor(options: IntroSequenceOptions) {
     this.options = options;
 
+    this.layer.eventMode = 'none';
+    options.overlay.addChildAt(this.layer, 0);
+
+    if (options.mode !== 'full') {
+      // Der Kurzteil braucht keine Bühne — nur die Beats.
+      this.layer.visible = false;
+      return;
+    }
+
     this.buildSniper();
 
     /*
@@ -92,10 +109,6 @@ export class IntroSequence {
 
     this.push.addChild(this.sniper, this.irisDisc, this.lensRing);
     this.layer.addChild(this.backdrop, this.push);
-    this.layer.eventMode = 'none';
-
-    // Unter dem Scope, damit dessen Vignette den Rand sauber abschließt.
-    options.overlay.addChildAt(this.layer, 0);
     this.resize();
   }
 
@@ -141,6 +154,7 @@ export class IntroSequence {
 
   /** Muss bei jedem Layout-Wechsel gerufen werden. */
   resize(): void {
+    if (this.options.mode !== 'full') return;
     const { scope } = this.options;
     const width = scope.centerX * 2;
     const height = scope.centerY * 2;
@@ -161,12 +175,9 @@ export class IntroSequence {
     this.push.position.set(scope.centerX, scope.centerY);
   }
 
-  /**
-   * Baut die Timeline. `full` zeigt den Schützen, `short` beginnt direkt bei der Reihe —
-   * ab der zweiten Runde und bei „Bewegung reduzieren".
-   */
-  build(mode: IntroMode): gsap.core.Timeline {
-    const { camera, particles, warningShot, onScatter, reducedMotion } = this.options;
+  /** Baut die Timeline für den gewählten Modus. */
+  build(): gsap.core.Timeline {
+    const { camera, particles, warningShot, onScatter, reducedMotion, mode } = this.options;
     const timeline = gsap.timeline({ paused: true });
     this.timeline = timeline;
 

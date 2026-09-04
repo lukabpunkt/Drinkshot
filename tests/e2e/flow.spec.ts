@@ -6,7 +6,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { ARENA_TIMEOUT, betAllAndStart } from './helpers';
+import { ARENA_TIMEOUT, betAllAndStart, placeBet, tapPass } from './helpers';
 
 const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
 
@@ -135,10 +135,11 @@ test('Einsatz ist nach dem Bestätigen nirgends mehr sichtbar', async ({ page })
   await setUpLobby(page, ['Anna', 'Ben']);
   await page.getByRole('button', { name: "Los geht's!" }).click();
 
-  await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
-  await page.locator('.screen--pass').click();
+  // `tapPass` wartet, bis der Bet-Screen wirklich steht — sonst klickt der nächste
+  // Schritt gegen den noch laufenden Wipe.
+  await tapPass(page);
   await page.getByRole('button', { name: 'Einsatz erhöhen' }).click(); // 3 → 4
-  await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+  await placeBet(page);
 
   // Zurück auf dem Pass-Screen für Spieler 2: keine Zahl, kein Stepper.
   await expect(page.locator('.screen--pass')).toBeVisible();
@@ -149,13 +150,12 @@ test('Einsatz ist nach dem Bestätigen nirgends mehr sichtbar', async ({ page })
    * Und auch der Start-Screen verrät nichts. Er ist die neue Stelle, an der man das
    * brechen könnte: Er kennt alle Einsätze und steht nach dem letzten Bestätigen.
    */
-  await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
-  await page.locator('.screen--pass').click();
+  await tapPass(page);
   await page.getByRole('button', { name: 'Einsatz senken' }).click(); // 3 → 2
-  await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+  await placeBet(page);
 
   const ready = page.locator('.screen--ready');
-  await expect(ready).toBeVisible();
+  await expect(ready).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.stepper__value')).toHaveCount(0);
   // Keine der gesetzten Zahlen steht auf dem Screen — auch nicht in einer Summe (6).
   const text = (await ready.innerText()).replace(/\d+ von \d+/g, '');

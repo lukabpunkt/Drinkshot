@@ -7,7 +7,9 @@
 | M2 Shotlings & Arena | ✅ fertig (⏳ 2 manuelle Checks offen) | `v0.2.0` | A2 bestanden |
 | M3 Scope, Choreo, Schuss | ✅ fertig (⏳ 3 manuelle Checks offen) | `v0.3.0` | A3 bestanden |
 | M4 Todesanimationen | ✅ fertig (⏳ 1 manueller Check offen) | `v0.4.0` | A4 bestanden |
-| M5 Polish, Modi, A11y | ⬜ offen | – | – |
+| M5 Polish, Modi, A11y | ✅ fertig (⏳ 4 manuelle Checks offen) | `v0.5.0` | A5 bestanden |
+| M5b Showdown & Start-Screen | ✅ fertig | `v0.6.0` | – |
+| Auftakt & vier gemeldete Fehler | ✅ fertig (⏳ 8 manuelle Checks offen) | – | – |
 | M6 Playtest & Release | ⬜ offen | – | – |
 
 ## Audit-Reports
@@ -1089,6 +1091,9 @@ die Ausgeschiedenen im selben Moment wieder aktiv wurden.
 | | |
 |---|---|
 | Unit-Tests | 451 (vorher 436) |
+| E2E | 75 grün auf iPhone 12 (WebKit) und Pixel 5 (Chromium), 5 übersprungen |
+| Perf | Draw-Calls 5 · p50 16,7 ms · p95 18,5 ms · Heap +540 KB über 30 s |
+| Gemessen (E2E) | Runde 1: 16,4 s · Runde 2: 15,9 s bis zum Schuss — der Auftakt ist jetzt in beiden drin |
 | Neue ADRs | 56 (Turnier-Einsatz) · 57 (Turniergrenze) · 58 (Heimweg) · 59 (Auftakt immer) |
 | Korrigiert | ADR-11 — die Begründung war falsch |
 | Entfallen | `SessionStore.resetRounds()`, `IntroMode`/`'short'` |

@@ -61,6 +61,13 @@ export const UI_COLORS = {
   arenaSand: 0xe8c874,
   scopeVignette: 0x05040a,
   scopeGlass: 0x8fd3ff,
+  /**
+   * Der Schuetze im Intro (GDD §3.5). Gedaempftes Oliv statt `ink`: Er soll dunkel und
+   * anonym wirken, aber gegen die fast schwarze Vignette noch lesbar sein — mit `ink`
+   * getintet verschwand er komplett. Und er darf keine Spielerfarbe tragen, sonst haelt
+   * man ihn fuer einen Mitspieler.
+   */
+  sniper: 0x5c6b4a,
 } as const;
 
 export const SCOPE = {

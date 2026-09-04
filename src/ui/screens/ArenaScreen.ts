@@ -9,11 +9,15 @@ import gsap from 'gsap';
 import { ARENA, shotlingHeightFor } from '@/config/theme';
 import { HEARTBEAT } from '@/config/choreo';
 import { buildShowScript } from '@/core/choreographer';
+import { INTRO } from '@/config/choreo';
+import { IntroSequence, type IntroMode } from '@/game/IntroSequence';
+import { lineupPositions, warningShotPoint } from '@/game/introLineup';
 import { createSeededRng } from '@/core/rng';
 import { t } from '@/core/i18n';
 import type { PlayerId } from '@/core/lottery';
 import type { DeathId } from '@/core/session';
 import * as audio from '@/audio/AudioManager';
+import { prefersReducedMotion } from '@/ui/animate';
 import { showToast } from '@/ui/components/toast';
 import { vibrate } from '@/ui/haptics';
 import type { ScreenContext, ScreenInstance } from '@/ui/router';
@@ -180,6 +184,53 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   let releaseWakeLock: (() => void) | undefined;
   let offLayout: (() => void) | undefined;
   let tickerFn: ((ticker: { deltaMS: number }) => void) | undefined;
+  let intro: IntroSequence | undefined;
+  let offIntroLayout: (() => void) | undefined;
+  let onIntroTap: ((event: Event) => void) | undefined;
+  /** Wohin der Warnschuss geht — steht erst nach der Aufstellung fest. */
+  let warningShot = { x: 0, y: 0 };
+
+  /*
+   * Wie viel Auftakt? Die volle Inszenierung nur in der **ersten** Runde einer Session —
+   * ein siebensekündiger Vorspann vor jeder Runde wäre am achten Abend nur Wartezeit.
+   *
+   * Der Auslöser ist `roundNumber`, bewusst **kein** persistentes Flag: Der E2E-Test
+   * „Kurz vs. Lang" misst zweimal in derselben Seite und leert localStorage nur beim
+   * ersten Laden — ein Flag gäbe der ersten Messung die volle Inszenierung und der
+   * zweiten nur den Kurzteil, und die gemessene Differenz bräche ein.
+   *
+   * In den Dev-Modi bleibt der Auftakt ganz aus: `?hold=1` misst Draw-Calls und
+   * Frame-Zeiten, `?panel=deaths` beurteilt einzelne Sequenzen — beides würde die
+   * Inszenierung verfälschen.
+   */
+  const introMode: IntroMode | 'none' = isHoldMode(ctx.dev)
+    ? 'none'
+    : prefersReducedMotion() || ctx.fsm.context.roundNumber > 0
+      ? 'short'
+      : 'full';
+
+  /**
+   * Während der Inszenierung springt ein Tipp irgendwohin ans Ende — ohne sichtbaren
+   * Knopf, der die Wirkung nähme.
+   *
+   * Wichtig: Er startet die **Show**, nicht das Ergebnis. Wer hier `finish()` auslöste,
+   * landete im Result einer Runde, deren Show nie lief.
+   */
+  function armIntroSkip(skip: () => void): void {
+    onIntroTap = (event) => {
+      // Der Skip-Knopf der Show hat seinen eigenen Handler.
+      if ((event.target as HTMLElement | null)?.closest('button')) return;
+      skip();
+    };
+    el.addEventListener('pointerdown', onIntroTap);
+  }
+
+  function disarmIntroSkip(): void {
+    if (onIntroTap) el.removeEventListener('pointerdown', onIntroTap);
+    onIntroTap = undefined;
+    offIntroLayout?.();
+    offIntroLayout = undefined;
+  }
   /*
    * Tab-Wechsel: pausieren statt weiterlaufen (Audit A3).
    *
@@ -264,6 +315,9 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
      */
     if (handle && tickerFn) handle.app.ticker.remove(tickerFn);
     tickerFn = undefined;
+    disarmIntroSkip();
+    intro?.destroy();
+    intro = undefined;
     director?.destroy();
     director = undefined;
     scope?.destroy();
@@ -344,6 +398,30 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       brains.push(brain);
     });
     resolveOverlaps(brains);
+
+    /*
+     * Die Aufstellung vor dem Warnschuss (GDD §3.5): Sie stehen aufgereiht und rühren
+     * sich nicht. `frozen` statt `speedMultiplier = 0`, weil `resolveOverlaps` die enge
+     * Reihe sonst jeden Frame auseinanderdrückte.
+     */
+    if (introMode !== 'none') {
+      const lineup = lineupPositions({
+        count: brains.length,
+        height,
+        centerX: arena.centerX,
+        centerY: arena.centerY,
+        walkRadius: arena.walkRadius,
+      });
+      brains.forEach((brain, index) => {
+        const point = lineup[index];
+        if (!point) return;
+        brain.x = point.x;
+        brain.y = point.y;
+        brain.frozen = true;
+      });
+      warningShot = warningShotPoint(lineup, height);
+      for (const shotling of shotlings.values()) shotling.update(0);
+    }
 
     /*
      * Braucht die gewürfelte Sequenz einen Hut (`head_hat_launch` schiesst ihn weg), setzt
@@ -459,6 +537,8 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
         // ersten überspringen darf, verpasst den Rest der Runde.
         if (final) skip.hidden = false;
       },
+      // Die Blende hat den Sound schon gespielt — der Beat würde ihn sonst wiederholen.
+      playIntroCue: introMode === 'none',
       onLockEngaged: () => {
         startLockPulse();
         /*
@@ -543,7 +623,50 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     }
 
     // In der Death-Preview startet nichts von allein — das Dropdown gibt den Takt vor.
-    if (!isDeathPreview(ctx.dev)) director.play();
+    if (isDeathPreview(ctx.dev)) return;
+
+    const show = director;
+    let started = false;
+    const startShow = (): void => {
+      if (started || disposed) return;
+      started = true;
+      disarmIntroSkip();
+      intro?.destroy();
+      intro = undefined;
+      show.play();
+    };
+
+    if (introMode === 'none') {
+      startShow();
+      return;
+    }
+
+    intro = new IntroSequence({
+      overlay: handle.overlay,
+      sheet: assets.shotlings,
+      scope,
+      camera,
+      particles,
+      warningShot,
+      lowEffects,
+      reducedMotion: prefersReducedMotion(),
+      onScatter: () => {
+        for (const brain of brains) {
+          brain.frozen = false;
+          brain.burst(INTRO.scatterMs);
+        }
+      },
+    });
+
+    const sequence = intro;
+    offIntroLayout = handle.onLayout(() => sequence.resize());
+    armIntroSkip(() => {
+      sequence.skip();
+      startShow();
+    });
+
+    sequence.build(introMode).eventCallback('onComplete', startShow);
+    sequence.play();
   }
 
   return {
@@ -556,6 +679,9 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     destroy() {
       disposed = true;
       stopLockPulse();
+      disarmIntroSkip();
+      intro?.destroy();
+      intro = undefined;
       if (fallbackTimer !== undefined) globalThis.clearTimeout(fallbackTimer);
       document.removeEventListener('visibilitychange', onVisibility);
       releaseWakeLock?.();

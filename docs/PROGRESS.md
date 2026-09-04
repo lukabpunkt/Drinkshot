@@ -805,6 +805,16 @@ Dazu drei weitere Zusicherungen, alle gemessen statt behauptet:
 5. **Das LOCK-Schild hing an einer Wanduhr** (`setTimeout` auf den ersten Lock) und driftete
    beim Tab-Wechsel gegen die Show.
 
+6. **Der Lobby-Helfer machte aus zwei Spielern drei.** Der Lobby-Screen legt seine
+   Startspieler in `activate()` an, also erst **nach** dem Wipe. Wer vorher die Zeilen
+   zählt, sieht null, klickt „Spieler hinzufügen" — und bekommt die Startspieler oben
+   drauf. Lokal fiel das nie auf; auf dem CI-Runner schlugen dadurch genau die vier Tests
+   mit zwei Spielern fehl, und zwar konsistent über alle drei Wiederholungsversuche.
+   Gefunden hat es der Seiten-Schnappschuss im Playwright-Report: „Spieler 3 von 3" in
+   einem Test mit zweien. Der Helfer wartet jetzt auf die erste Zeile und sichert am Ende
+   die Spielerzahl zu — ein Fehler fliegt damit in der Lobby auf statt drei Screens
+   später.
+
 Dazu zwei Fehler in meinen eigenen neuen Tests, die etwas Echtes gezeigt haben:
 Montage-Segmente unter 2,2 s erzeugten Beats von **einer Millisekunde** — Tod, Lock und ein
 sichtbarer Wechsel passen darunter nicht. Und die erste Fassung des Überlebenden-Tests
@@ -821,6 +831,13 @@ Segments.
 | Referenz-Hash der bestehenden Modi | unverändert über 10 500 Skripte |
 | JS gzip | 251 KB (Budget 450), Einstieg 23 KB, Arena weiterhin lazy |
 | Kontrast | 26 Paare, schlechtestes 4,58:1 |
+| CI | grün — 421 Unit, 45 E2E (iPhone 12 = WebKit und Pixel 5), 3 Perf |
+
+**Zur Aussagekraft der lokalen Läufe:** Auf dieser Maschine lag während der Arbeit eine
+Grundlast von 5–6 (mehrere andere Projekte). In jedem vollen E2E-Lauf fiel deshalb ein
+*anderer* Test durch, während jeder einzeln grün war — dasselbe Muster wie in M4. Der
+belastbare Beleg ist die CI auf einem freien Runner; und sie hat unter dem Lastrauschen
+einen echten Fehler sichtbar gemacht (Nr. 6), den lokal nie einer gezeigt hätte.
 
 **Manuelle Checks, die Luka bestätigen muss:**
 - [ ] **Trägt die Kaskade?** Auftakt → Montage → Finale. Oder ist die Mitte zäh?

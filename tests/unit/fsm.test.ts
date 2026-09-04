@@ -309,7 +309,7 @@ describe('FSM — Setter', () => {
   });
 });
 
-describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-53)', () => {
+describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-56)', () => {
   const PLAYERS = ['a', 'b', 'c'];
 
   /** Spielt eine Setzphase durch und startet die Show. */
@@ -366,7 +366,7 @@ describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-53)', () =>
 
   it('geht in eine frische Setzphase, sobald wieder alle antreten', () => {
     const fsm = tournament();
-    // Turnier entschieden: `activePlayers()` liefert wieder das volle Feld (ADR-54).
+    // Turnier entschieden: `activePlayers()` liefert wieder das volle Feld (ADR-57).
     fsm.setPlayers(PLAYERS);
     fsm.send({ type: 'nextRound' });
 
@@ -459,7 +459,7 @@ describe('FSM — Ziehung genau einmal (ADR-2)', () => {
   });
 });
 
-describe('quit — der Weg zurueck ins Hauptmenue (ADR-55)', () => {
+describe('quit — der Weg zurueck ins Hauptmenue (ADR-58)', () => {
   it.each(['LOBBY', 'PASS', 'BET', 'READY', 'ARENA', 'RESULT'] as const)(
     'fuehrt aus %s an den Titel',
     (state) => {

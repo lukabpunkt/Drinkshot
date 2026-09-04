@@ -63,7 +63,7 @@ export interface FsmContext {
    * Summe aller Einsaetze des laufenden Turniers.
    *
    * In Sudden Death schrumpft `bets` mit dem Teilnehmerfeld — der Letzte verteilt aber die
-   * Summe aller urspruenglichen Einsaetze (ADR-53). Ausserhalb eines Turniers ist das
+   * Summe aller urspruenglichen Einsaetze (ADR-56). Ausserhalb eines Turniers ist das
    * schlicht die Summe von `bets`.
    */
   potSips: number;
@@ -165,11 +165,11 @@ export function createFsm(options: FsmOptions = {}): Fsm {
    * Traegt die Runde die Einsaetze der vorigen weiter?
    *
    * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen, bis einer
-   * steht (ADR-53). Das haengt an `MODE_SPECS[...].eliminates`: Ein Modus, der ausscheiden
+   * steht (ADR-56). Das haengt an `MODE_SPECS[...].eliminates`: Ein Modus, der ausscheiden
    * laesst, spielt ein Turnier — und ein Turnier setzt am Anfang, nicht vor jeder Runde.
    *
    * Die Bedingung beendet sich von selbst. Ist das Turnier entschieden, gibt
-   * `activePlayers()` wieder alle zurueck (ADR-54); fuer die meisten davon gibt es keinen
+   * `activePlayers()` wieder alle zurueck (ADR-57); fuer die meisten davon gibt es keinen
    * Einsatz mehr, und es geht wie gewohnt in eine frische Setzphase.
    */
   const carriesStakes = (): boolean =>
@@ -278,7 +278,7 @@ export function createFsm(options: FsmOptions = {}): Fsm {
       /*
        * Zurueck ans Lagerfeuer. Bis hierher gab es diesen Weg nicht — kein Event hatte
        * TITLE als Ziel, und wer einmal "Spielen" gedrueckt hatte, kam bis zum Neuladen
-       * nicht mehr zurueck (ADR-55).
+       * nicht mehr zurueck (ADR-58).
        */
       case 'quit':
         resetRound();

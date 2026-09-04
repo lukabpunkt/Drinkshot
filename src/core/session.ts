@@ -57,7 +57,7 @@ export interface RoundSetup {
   /**
    * Der Topf des **Turniers**, nicht der Runde.
    *
-   * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen (ADR-53).
+   * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen (ADR-56).
    * `bets` schrumpft dabei mit dem Teilnehmerfeld — was der Letzte verteilt, ist aber die
    * Summe **aller** urspruenglichen Einsaetze. Ausserhalb eines Turniers ist das genau
    * `totalSips(bets)`.
@@ -91,7 +91,7 @@ export interface Session {
    *
    * Wird bei jedem `begin` neu gesetzt. `eliminatedPlayerIds` sieht nur juengere Runden an —
    * so holt ein neues Spiel die Ausgeschiedenen zurueck, ohne das Scoreboard des Abends zu
-   * verlieren (ADR-54). Ein Zeitstempel statt eines Index, weil die History bei
+   * verlieren (ADR-57). Ein Zeitstempel statt eines Index, weil die History bei
    * `MAX_ROUND_HISTORY` vorne abgeschnitten wird.
    */
   tournamentFrom: number;
@@ -287,7 +287,7 @@ export function resolveRound(setup: RoundSetup, finishedAt = Date.now()): RoundR
       };
       if (survivors.length === 1) {
         result.winnerId = survivors[0]!;
-        // Der Topf des ganzen Turniers, nicht nur der beiden Finalisten (ADR-53).
+        // Der Topf des ganzen Turniers, nicht nur der beiden Finalisten (ADR-56).
         result.sipsToDistribute = setup.potSips;
       }
       return result;
@@ -314,7 +314,7 @@ export function scoreboard(session: Session): Record<PlayerId, number> {
 /**
  * Im Modus "Sudden Death" ausgeschiedene Spieler — aus der Runden-History abgeleitet.
  *
- * Nur das **laufende Turnier** zaehlt. Zwei Grenzen ziehen es ein (ADR-54):
+ * Nur das **laufende Turnier** zaehlt. Zwei Grenzen ziehen es ein (ADR-57):
  *
  * 1. `session.tournamentFrom` — bei jedem `begin` neu gesetzt. Wer mitten im Turnier in die
  *    Lobby geht und neu startet, faengt mit vollem Feld an.
@@ -393,7 +393,7 @@ function sanitizeRounds(rounds: unknown): RoundResult[] {
       extraDeaths: Array.isArray(round.extraDeaths) ? round.extraDeaths : [],
       odds: typeof round.odds === 'object' && round.odds !== null ? round.odds : {},
       finishedAt: typeof round.finishedAt === 'number' ? round.finishedAt : 0,
-      // Vor ADR-53 gab es kein `potSips` — der Rundeneinsatz ist dort die richtige Antwort.
+      // Vor ADR-56 gab es kein `potSips` — der Rundeneinsatz ist dort die richtige Antwort.
       potSips: typeof round.potSips === 'number' ? round.potSips : totalSips(bets),
     });
   }
@@ -456,7 +456,7 @@ export interface SessionStore {
 
   /**
    * Zieht die Turniergrenze neu — ab jetzt zaehlt kein frueheres Ausscheiden mehr.
-   * Laeuft bei jedem `begin`. Runden und Scoreboard bleiben unangetastet (ADR-54).
+   * Laeuft bei jedem `begin`. Runden und Scoreboard bleiben unangetastet (ADR-57).
    */
   startTournament(): void;
   /** Alles zurueck auf Werkszustand. */

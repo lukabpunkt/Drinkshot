@@ -338,11 +338,11 @@ test('Portrait scrollt nicht horizontal', async ({ page }) => {
   expect(overflow).toBe(false);
 });
 
-test('Hauptmenue ist aus jedem Screen erreichbar (ADR-55)', async ({ page }) => {
+test('Hauptmenue ist aus jedem Screen erreichbar (ADR-58)', async ({ page }) => {
   await freshStart(page);
 
   /*
-   * Bis ADR-55 gab es keinen einzigen Uebergang zurueck an den Titel — wer einmal
+   * Bis ADR-58 gab es keinen einzigen Uebergang zurueck an den Titel — wer einmal
    * "Spielen" gedrueckt hatte, kam bis zum Neuladen nicht mehr hin.
    */
   await page.getByRole('button', { name: 'Spielen' }).click();
@@ -369,7 +369,7 @@ test('Hauptmenue ist aus jedem Screen erreichbar (ADR-55)', async ({ page }) => 
   await expect(page.locator('.screen--title')).toBeVisible();
 });
 
-test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-53)', async ({ page }) => {
+test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-56)', async ({ page }) => {
   test.setTimeout(240_000);
 
   await freshStart(page, { mode: 'suddenDeath', duration: 'short', miracles: false, sound: false });
@@ -399,7 +399,7 @@ test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-53)', async ({ pag
 
   /*
    * Und danach treten wieder alle drei an — vorher blieben Ausgeschiedene fuer immer
-   * markiert, und bei einem Verbliebenen war "Naechste Runde" ausgegraut (ADR-54).
+   * markiert, und bei einem Verbliebenen war "Naechste Runde" ausgegraut (ADR-57).
    */
   const next = page.getByRole('button', { name: 'Nächste Runde' });
   await expect(next).toBeEnabled();

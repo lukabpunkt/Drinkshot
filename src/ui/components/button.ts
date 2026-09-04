@@ -86,7 +86,7 @@ export function createChip(options: ChipOptions): HTMLButtonElement {
 }
 
 /**
- * Ikonen-Knopf am Bildschirmrand — Heimweg und Rundenabbruch (ADR-55).
+ * Ikonen-Knopf am Bildschirmrand — Heimweg und Rundenabbruch (ADR-58).
  *
  * Bewusst kein Sticker-Button: Er soll erreichbar sein, aber nicht mit dem CTA um
  * Aufmerksamkeit ringen. Volle 44-px-Trefferflaeche, Glyphe deutlich kleiner.

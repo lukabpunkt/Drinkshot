@@ -115,7 +115,7 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 
 | Phase      | Zeit (bei 15 s) | Was passiert                                                                                                                                                                                             |
 | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auftakt** | vor der Runde  | **Nur in der ersten Runde einer Session** (~6 s): Man sieht den Schützen von vorne — genauer sein Zielfernrohr, das einen anschaut, und dahinter einen Chibi-Kopf mit Helm. Die Kamera fährt in die Linse, die Blende öffnet sich. Ein Tipp überspringt. |
+| **Auftakt** | vor jeder Runde (~5,0 s) | Man sieht den Schützen von vorne — genauer sein Zielfernrohr, das einen anschaut, und dahinter einen Chibi-Kopf mit Helm. Die Kamera fährt in die Linse, die Blende öffnet sich. Ein Tipp überspringt — aber erst nach 700 ms, sonst löscht ein Streifen beim Hinlegen des Handys den Auftakt. Bei „Bewegung reduzieren" bleibt der Schütze sichtbar, die Kamerafahrt wird zum Schnitt und das Wackeln entfällt (ADR-59). |
 | **Aufstellung** | jede Runde (~1,9 s) | Die Männchen stehen aufgereiht und rühren sich nicht — eine Reihe bis sechs Spieler, ab sieben zwei versetzte. Dann ein **Warnschuss** vor die Füße des Äußersten: Erdfontäne, Knall, und **erst jetzt** stieben sie auseinander. |
 | **Intro**  | 0.0 – 1.5 s     | Scope-Blende offen, leichtes Atmen (Scope wobbelt). Alle Männchen sichtbar, laufen.                                                                                      |
 | **Scan**   | 1.5 – 6.0 s     | Fadenkreuz gleitet weich von Männchen zu Männchen (jedes mind. 1×), Verweildauer 0.6–1.2 s. Beim Ankommen "Lock-Tick"-Sound + Reticle-Pulse.                                                             |
@@ -137,7 +137,7 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | **Klassik** (Default) | Opfer trinkt eigenen Einsatz.                                                                                                       | Einfach, sofort verständlich.                                                                 |
 | **Verteiler**         | Opfer wird angeschossen; **alle anderen** trinken den Einsatz des Opfers (das Opfer "verteilt" posthum).                            | Belohnt Mut: hoher Einsatz = hohes Risiko, aber die anderen zahlen. Näher am Ursprungs-Pitch. |
-| **Sudden Death**      | Wie Klassik, aber der Getroffene scheidet für die Session aus; letzter Überlebender bekommt die Summe aller Einsätze zum Verteilen. | Turnier-Feeling für 5+ Spieler.                                                               |
+| **Sudden Death**      | Ein **Turnier**: Gesetzt wird **einmal am Anfang**, danach fällt Runde für Runde einer, bis einer steht. Jeder Getroffene trinkt seinen eigenen Einsatz und scheidet für das Turnier aus; der Letzte bekommt die Summe **aller** Einsätze zum Verteilen. Danach treten wieder alle an (ADR-56, ADR-57). | Turnier-Feeling für 5+ Spieler.                                                               |
 | **Double Tap**        | Wie Klassik, aber es fallen 2 Schüsse (2 Opfer, ohne Zurücklegen).                                                                  | Für große Gruppen (6–8).                                                                      |
 | **Showdown**          | Es wird geschossen, bis nur einer steht. Jeder Getroffene trinkt seinen eigenen Einsatz, der Überlebende verteilt seinen. **Kein Ausscheiden für die Session** — nächste Runde sind alle wieder dabei. Wunder sind hier aus, weil genau einer überleben muss. | Der große Auftritt: eine Runde als ganzer Abend im Kleinen. |
 
@@ -149,8 +149,8 @@ Die Phase ist ein **Skript** (Timeline), nicht Freiplay. Die Männchen laufen KI
 - Großer Reveal: Farb-Badge + Name des Opfers, Trefferzone-Icon (Kopf/Brust/Bein/…), Zeile "**{Name} trinkt {N} Schlücke!**" mit fettem Number-Punch.
 - Darunter aufklappbar: "Alle Einsätze" — jetzt sind alle Einsätze öffentlich (Tabelle Farbe · Name · Einsatz · Chance %). **Das ist der zweite Comedy-Moment:** "Du hast 1 gesetzt und wurdest trotzdem getroffen?!"
 - Session-Scoreboard: Balken pro Spieler "insgesamt getrunken".
-- Buttons: **"Nächste Runde"** (gleiche Spieler, direkt in Betting) · "Spieler ändern" · "Modus ändern".
-- Im **Showdown** steht nicht das Opfer im Mittelpunkt, sondern der Überlebende: sein Badge, seine Farbe, "Überlebt"-Abzeichen in Gold, Kopfzeile "{Name} überlebt!", darüber "{n} Schüsse. Einer steht noch." In der Einsatz-Tabelle ist er hervorgehoben statt des Opfers.
+- Buttons: **"Nächste Runde"** (gleiche Spieler, direkt in Betting) · "Spieler ändern" · "Modus ändern" · "Hauptmenü". Im laufenden Sudden-Death-Turnier heißt der erste **"Weiter"** und führt ohne neue Setzphase direkt auf den Start-Screen (ADR-56).
+- Ist die Runde **entschieden** — Showdown, oder die Schlussrunde eines Sudden-Death-Turniers —, steht nicht das Opfer im Mittelpunkt, sondern der Überlebende: sein Badge, seine Farbe, "Überlebt"-Abzeichen in Gold, Kopfzeile "{Name} überlebt!", darüber "{n} Schüsse. Einer steht noch." In der Einsatz-Tabelle ist er hervorgehoben statt des Opfers.
 
 ---
 

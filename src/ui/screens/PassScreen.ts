@@ -57,7 +57,7 @@ export function createPassScreen(ctx: ScreenContext): ScreenInstance {
   /*
    * Die Tap-Flaeche ist ein echter Button, nicht der Screen selbst.
    *
-   * Frueher trug `el` `role="button"`. Seit hier ein Abbruch-✕ sitzt (ADR-55), waere das
+   * Frueher trug `el` `role="button"`. Seit hier ein Abbruch-✕ sitzt (ADR-58), waere das
    * ein verschachteltes Bedienelement — axe meldet `nested-interactive`. Der Button liegt
    * flaechendeckend darunter, das ✕ darueber.
    */

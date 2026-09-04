@@ -183,7 +183,7 @@ export class IntroSequence {
     /*
      * Die Fahrt in die Linse — bei „Bewegung reduzieren" ein harter Schnitt.
      *
-     * Der Schütze bleibt dabei sichtbar (ADR-56). Vorher fiel der ganze Auftakt weg,
+     * Der Schütze bleibt dabei sichtbar (ADR-59). Vorher fiel der ganze Auftakt weg,
      * sobald die Systemeinstellung gesetzt war; jetzt entfällt nur die Bewegung.
      */
     if (reducedMotion) {

@@ -179,7 +179,7 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
 
   /*
    * Läuft ein Turnier noch, ist die nächste Runde keine neue Runde, sondern der nächste
-   * Schuss — und niemand setzt dafür neu (ADR-53). Der Knopf sagt das.
+   * Schuss — und niemand setzt dafür neu (ADR-56). Der Knopf sagt das.
    */
   const inTournament = eliminatedPlayerIds(ctx.session.state).size > 0;
 

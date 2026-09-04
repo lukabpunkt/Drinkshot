@@ -153,7 +153,9 @@ Drinkshot/
    │         │  RESULT  │──────────────────────┘
    │         └────┬─────┘   changePlayers
    │              │ nextRound → PASS(0)
-   └──────────────┘ (via LOBBY nur bei changePlayers)
+   └──────────────┘ (im Turnier direkt → READY, ohne neue Setzphase)
+
+   Aus **jedem** State ausser TITLE führt zusätzlich `quit` zurück an den Titel.
 ```
 
 **Übergangsregeln:**
@@ -161,7 +163,9 @@ Drinkshot/
 - `drawVictim()` wird **genau einmal** beim Übergang READY→ARENA aufgerufen und legt `round.victimId`, `round.deathId`, `round.seed` fest. ARENA liest nur, entscheidet nichts. (Bis M5 hing die Ziehung am letzten `confirm`; seit der Start-Screen dazwischensteht, hängt sie an dem Übergang, der die Show wirklich startet — wer aus READY abbricht, hat nie gezogen. ADR-40.)
 - `RESULT` schreibt Runde ins Session-Log (localStorage), erhöht Scoreboard.
 - Jeder State hat `enter/exit`-Hooks (Audio, Wake-Lock, Screen-Mount/Unmount).
-- Browser-Back-Button: In PASS/BET/ARENA abgefangen ("Runde abbrechen?"-Dialog), sonst normale Navigation.
+- Browser-Back-Button: In PASS/BET/READY/ARENA abgefangen ("Runde abbrechen?"-Dialog), in RESULT `changePlayers`, in LOBBY `quit`. Die App hält dafür ausserhalb von TITLE genau **einen** eigenen History-Eintrag (ADR-58).
+- `quit` → `TITLE`, aus jedem State ausser TITLE. Lobby und Ergebnis haben dafür einen sichtbaren Knopf, die Runden-Screens ein ✕ auf den Abbruch-Dialog. In der installierten PWA (`display: standalone`) gibt es keinen Browser-Zurück-Knopf — ohne diese Knöpfe wäre die Arena dort unverlassbar (ADR-58).
+- `nextRound` führt in einem laufenden Turnier (`MODE_SPECS[mode].eliminates`, alle Verbliebenen haben einen Einsatz) direkt nach `READY` statt nach `PASS`: In Sudden Death wird einmal gesetzt, nicht vor jeder Runde (ADR-56).
 
 ---
 
@@ -189,6 +193,7 @@ interface RoundSetup {
   deathId: DeathId; // gewählte Todesanimation
   mode: GameMode;
   durationPreset: 'short' | 'normal' | 'long';
+  potSips: number; // Topf des Turniers; ausserhalb = Summe von `bets` (ADR-56)
 }
 
 interface RoundResult extends RoundSetup {
@@ -201,6 +206,7 @@ interface Session {
   players: Player[];
   rounds: RoundResult[];
   settings: Settings;
+  tournamentFrom: number; // ab wann die History zum laufenden Turnier zaehlt (ADR-57)
 }
 
 interface Settings {

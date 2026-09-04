@@ -151,7 +151,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
    * Der einzige Ausstieg aus der Arena.
    *
    * In der installierten PWA (`display: standalone`) gibt es keinen Browser-Zurueck-Knopf.
-   * Ohne dieses ✕ waere die Arena dort unverlassbar, sobald etwas haengt (ADR-55). Es
+   * Ohne dieses ✕ waere die Arena dort unverlassbar, sobald etwas haengt (ADR-58). Es
    * erscheint erst nach dem Auftakt, damit es waehrend des Schuetzen nicht ablenkt.
    */
   const exit = createIconButton({
@@ -209,7 +209,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   let warningShot = { x: 0, y: 0 };
 
   /*
-   * Der Auftakt läuft in **jeder** Runde (ADR-56).
+   * Der Auftakt läuft in **jeder** Runde (ADR-59).
    *
    * Vorher hing er an `roundNumber === 0`. Das war als „erste Runde einer Session"
    * gedacht, umgesetzt war es „erste Runde pro Seitenladung": `roundNumber` wurde

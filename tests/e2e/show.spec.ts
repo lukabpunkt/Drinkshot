@@ -348,7 +348,7 @@ test('Intro: jede Runde bekommt den vollen Auftakt', async ({ page }) => {
 
   /*
    * Frueher lief der Auftakt nur in der ersten Runde — und weil `roundNumber` nirgends
-   * zurueckgesetzt wurde, danach bis zum Neuladen der Seite nie wieder (ADR-56). Beide
+   * zurueckgesetzt wurde, danach bis zum Neuladen der Seite nie wieder (ADR-59). Beide
    * Runden haben dieselbe Show-Laenge, also darf sich nur noch Messrauschen unterscheiden.
    */
   expect(Math.abs(first - second)).toBeLessThan(3_000);
@@ -366,7 +366,7 @@ test('Intro: ein Streifen in den ersten Millisekunden loescht den Auftakt nicht'
   /*
    * Der READY-Screen fordert auf, das Handy hinzulegen — wer das tut, streift den Schirm.
    * Ohne Karenzzeit war der Skip-Handler schon waehrend des Wipes scharf und der Schuetze
-   * damit weg, noch bevor man ihn gesehen hatte (ADR-56).
+   * damit weg, noch bevor man ihn gesehen hatte (ADR-59).
    */
   await page.locator('.screen--arena').click({ position: { x: 100, y: 300 } });
 

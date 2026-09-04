@@ -87,6 +87,12 @@ export function createLobbyScreen(ctx: ScreenContext): ScreenInstance {
     wobble: true,
     className: 'btn--block lobby__start',
     onClick: () => {
+      /*
+       * Ein neues Spiel hebt das Ausscheiden des vorigen Turniers auf (ADR-57) — und zwar
+       * **vor** dem Zaehlen. Andersherum startete die Partie mit dem halben Feld, waehrend
+       * die Ausgeschiedenen im selben Moment wieder aktiv wurden.
+       */
+      ctx.session.startTournament();
       const players = ctx.session.activePlayers();
       if (players.length < MIN_PLAYERS) {
         showToast(t('lobby.tooFewPlayers'), { variant: 'danger' });

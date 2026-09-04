@@ -352,7 +352,7 @@ describe('SessionStore', () => {
       setup({ mode: 'suddenDeath', bets: all.slice(0, 2), victimId: b.id, potSips: 6 })
     );
     expect(finale.winnerId).toBe(a.id);
-    // Der Letzte verteilt den Topf des Turniers, nicht nur den der Schlussrunde (ADR-53).
+    // Der Letzte verteilt den Topf des Turniers, nicht nur den der Schlussrunde (ADR-56).
     expect(finale.sipsToDistribute).toBe(6);
 
     store.recordRound(finale);
@@ -411,7 +411,7 @@ describe('SessionStore', () => {
     store.addPlayer(nameFor);
     store.recordRound(resolveRound(setup()));
     store.startTournament();
-    // Die History bleibt — nur das Ausscheiden davor zaehlt nicht mehr (ADR-54).
+    // Die History bleibt — nur das Ausscheiden davor zaehlt nicht mehr (ADR-57).
     expect(store.state.rounds).toHaveLength(1);
     expect(store.state.tournamentFrom).toBeGreaterThan(0);
     expect(store.state.players).toHaveLength(1);

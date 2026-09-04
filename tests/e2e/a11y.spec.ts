@@ -134,6 +134,14 @@ test('Sudden Death zeigt Ausgeschiedene in der Lobby', async ({ page }) => {
   // Der Name steht in einem Eingabefeld — der Text daneben sagt, dass die Person raus ist.
   await expect(eliminated.locator('.lobby__name')).toHaveValue('Ben');
   await expect(eliminated).toContainText('Ausgeschieden');
+
+  /*
+   * Ein neues Spiel hebt das Ausscheiden auf, und zwar **vollstaendig** (ADR-57): Frueher
+   * zaehlte die Lobby die Spieler, bevor die Grenze neu gezogen wurde, und die Partie
+   * startete mit dem halben Feld.
+   */
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+  await expect(page.locator('.pass__position')).toContainText('von 3');
 });
 
 test.describe('prefers-reduced-motion', () => {

@@ -959,3 +959,147 @@ also über dem Gesicht des Schützen.
 - [ ] **Acht Spieler:** Die Aufstellung ist dann ein Klassenfoto aus zwei Reihen. Wirkt
       das gewollt? (Geometrie ist getestet, das Aussehen nicht.)
 - [ ] **Mit „Bewegung reduzieren"** läuft nur der Kurzteil, ohne Kamerawackler.
+
+---
+
+## Vier gemeldete Fehler (2026-09-04)
+
+Luka hat nach dem Deploy vier Dinge gemeldet. Zwei davon waren keine Politur, sondern
+Defekte mit falscher Dokumentation — die Doku behauptete, das Problem sei gelöst.
+
+### 1 · „Der Scharfschütze ist nicht immer zu Beginn zu sehen"
+
+Drei unabhängige Ursachen, nicht eine:
+
+| Ursache | Was wirklich passierte |
+|---|---|
+| `roundNumber > 0` | Gemeint war „erste Runde einer Session", umgesetzt war „erste Runde **pro Seitenladung**". `resetRound()` fasste den Zähler nie an, kein `begin`, kein `cancel`, kein `changePlayers`. Eine komplett neue Partie mit neuen Spielern zeigte den Schützen nicht mehr — nur ein Reload brachte ihn zurück. |
+| `prefers-reduced-motion` | Strich den Auftakt **ersatzlos**. Auf mehreren Android-Skins schaltet der Akkusparmodus diese Einstellung mit um: Der Abend konnte mit Schütze anfangen und ohne weitergehen. |
+| `armIntroSkip` ohne Karenzzeit | Der Handler lag auf `pointerdown` über dem **ganzen** Bildschirm und war ~170–300 ms nach „Los!" scharf — noch während des Wipes, der `pointer-events: none` hat und also nichts abschirmt. Der READY-Screen fordert unmittelbar davor auf, das Handy hinzulegen. Wer das tat, streifte den Schirm und war um fünf Sekunden Inszenierung gebracht. |
+
+Der Auftakt läuft jetzt in **jeder** Runde. Bei reduzierter Bewegung bleibt der Schütze
+sichtbar, die Kamerafahrt wird zum Schnitt, das Wackeln entfällt — genau das, was der
+Kommentar an `reducedMotion` seit dem ersten Tag versprach, aber nie einlöste. Der Skip
+ist 700 ms taub, wie PASS (800 ms) und READY (400 ms) es seit je sind.
+
+Zwei Nebenbefunde aus derselben Ecke: Im Kurzmodus spielte **niemand** den
+`scope_open`-Cue — weder die `IntroSequence` (der Aufruf steckt im `full`-Zweig) noch der
+Director (`playIntroCue` war auf `'none'` gesetzt). Und `intro.pause()/resume()` waren
+toter Code; der Tab-Wechsel hielt nur den Director an. Der Kurzmodus selbst ist entfallen,
+er war unerreichbar geworden.
+
+### 2 · „Im Sudden Death nur einmal den Einsatz eingeben"
+
+Sudden Death lief wie Klassik: vor jeder Runde wanderte das Handy erneut durch die Gruppe,
+obwohl das Feld schrumpfte. Bei fünf Spielern sind das vier Setzphasen für vier Schüsse.
+
+Jetzt wird einmal gesetzt, danach führt „Weiter" vom Ergebnis direkt auf den Start-Screen,
+bis einer steht. Träger ist `MODE_SPECS[...].eliminates` — **das Flag existierte seit M1
+und wurde von niemandem gelesen.**
+
+Die Bedingung beendet sich von selbst: Ist das Turnier entschieden, treten wieder alle an
+(siehe 4), für die meisten gibt es keinen Einsatz mehr, und es geht in eine frische
+Setzphase. Kein neues Event, kein Turnier-Zustand in der FSM.
+
+`RoundSetup.potSips` hält die Summe **aller** ursprünglichen Einsätze fest, während `bets`
+mit dem Feld schrumpft. Ohne das verteilte der Letzte nur noch den Einsatz der beiden
+Finalisten. Auf dem Start-Screen steht im Turnier nur die Anzahl der Verbliebenen, **nie
+der Topf**: Bei zwei Verbliebenen liesse sich daraus der Einsatz des anderen ausrechnen
+(Audit A1, MUSS).
+
+### 3 · „Manchmal kommt man nicht mehr auf den Home-Bildschirm"
+
+Das „manchmal" war zu freundlich. **Es gab in der ganzen App keinen einzigen Übergang
+zurück nach `TITLE`** — kein Event der FSM hatte den Titel als Ziel. Wer einmal „Spielen"
+gedrückt hatte, erreichte ihn bis zum Neuladen der Seite nicht mehr, und damit auch die
+Einstellungen nicht, die nur von dort aus zu öffnen sind. Dass es sich „manchmal" anfühlte,
+lag daran, dass ein App-Neustart wieder am Titel landet.
+
+Verschärfend:
+
+- **Die Lobby war der Trichter.** Alle Abbruchpfade endeten dort, und `ALLOWED.LOBBY`
+  kannte genau ein Event: `begin`. Kein Rückweg, kein Header-Knopf.
+- **Die History-Einträge leckten.** `updateHistoryGuard` löschte beim Verlassen nur ein
+  Boolean, der gepushte Eintrag blieb im Stack — und jedes „Weiterspielen" legte einen
+  weiteren obendrauf. In der Lobby verpuffte der erste Zurück-Druck dann sichtbar
+  folgenlos. Das dürfte der Auslöser des Befunds gewesen sein.
+- **Die Arena hatte gar keinen Knopf,** und in der installierten PWA
+  (`display: standalone`) gibt es keinen Browser-Zurück-Knopf. Dort war sie unverlassbar.
+
+Dazu zwei stille Hänger, die niemand gemeldet hatte, weil sie nach nichts aussehen:
+
+- Endete die Show, während der Abbruch-Dialog offen stand, lief `cancel` im State `RESULT`.
+  Dort ist es nicht erlaubt, `send` gab **still** `false` zurück: Man tippte „Ja,
+  abbrechen" und nichts passierte.
+- `void build()` im ArenaScreen hatte **kein `.catch()`**. Eine Ausnahme ausserhalb der
+  beiden inneren `try`-Blöcke ließ den Screen mit `is-loading` (Deckkraft 0) stehen —
+  schwarz, ohne Knopf, ohne Notausgang-Timer, auch der Retry-Pfad lief dort hinein.
+
+Jetzt: ein `quit`-Event nach `TITLE` aus jedem State ausser TITLE; sichtbare Knöpfe in
+Lobby und Ergebnis; ein zurückhaltendes ✕ in Pass, Bet, Ready und Arena, das den
+bestehenden Abbruch-Dialog öffnet. In der Arena erscheint es erst, wenn die Show startet.
+Der Guard hält ausserhalb des Titels genau **einen** Eintrag.
+
+Ein Nebeneffekt: Der Privacy-Screen trug bisher selbst `role="button"`. Mit einem Knopf
+darin wäre das ein verschachteltes Bedienelement (axe: `nested-interactive`), deshalb ist
+die Tap-Fläche jetzt ein echter, flächendeckender Button unter dem Inhalt.
+
+### 4 · „Spieler werden noch als ausgeschieden angezeigt"
+
+`session.resetRounds()` existierte, war getestet — und wurde **im gesamten Produktivcode
+nie aufgerufen**. `docs/DECISIONS.md` (ADR-11) behauptete schwarz auf weiß, die Funktion
+hebe das Ausscheiden „automatisch" auf. Sie hob nichts auf.
+
+`eliminatedPlayerIds` sammelte über die ganze Runden-History, ohne `round.mode` oder
+`round.winnerId` anzusehen. Folgen:
+
+- Ausgeschiedene blieben es über Runden, Moduswechsel und Reloads hinweg.
+- Bei einem Verbliebenen war „Nächste Runde" ausgegraut **und** in der Lobby der Start
+  ebenfalls — der einzige Ausweg war „Session zurücksetzen", das Spieler, Namen, Farben
+  und das Scoreboard mitnahm. Ein Unit-Test hielt diese Sackgasse sogar als Soll-Verhalten
+  fest.
+- Die Truncation bei `MAX_ROUND_HISTORY = 50` holte nach 50 Runden stillschweigend
+  Ausgeschiedene zurück.
+
+Jetzt zieht `eliminatedPlayerIds` zwei Grenzen: rückwärts bis zur letzten entschiedenen
+Runde (`winnerId`) oder bis zu einer Runde eines Modus ohne Ausscheiden, und davor
+`session.tournamentFrom` — ein Zeitstempel, den jedes „Los geht's!" neu setzt. Ein
+Zeitstempel statt eines Index, weil die History vorne abgeschnitten wird.
+
+Das Scoreboard des Abends bleibt in beiden Fällen stehen. `resetRounds()` hätte es
+mitgelöscht und ist ersatzlos entfallen; ADR-11 ist korrigiert.
+
+Beim Verkabeln fiel noch eine Reihenfolge auf: Die Lobby zählte `activePlayers()`, **bevor**
+die Grenze neu gezogen wurde — eine neue Partie wäre mit halbem Feld gestartet, während
+die Ausgeschiedenen im selben Moment wieder aktiv wurden.
+
+### Was sonst noch dabei repariert wurde
+
+- `loadSession` validierte die Runden nicht. Ein Eintrag ohne `eliminatedIds` warf beim
+  Rendern der Lobby — die App startete dann bis zum Löschen des Speichers nicht mehr.
+  `sanitizeRounds` füllt jetzt auf und wirft Runden mit unbekanntem Modus weg.
+- Das HUD zeigte nach einem Reload wieder „RUNDE 1", obwohl `session.rounds` fünf Runden
+  kannte. `begin` setzt den Zähler jetzt zurück, statt ihn nie anzufassen.
+- `PREVIEW_PORT` für Playwright. Läuft daneben die Vite-Vorschau eines anderen Projekts
+  auf 4173, übernahm `reuseExistingServer` bisher stillschweigend deren Server, und der
+  Lauf brach mit einem nichtssagenden Timeout ab.
+
+### Zahlen
+
+| | |
+|---|---|
+| Unit-Tests | 451 (vorher 436) |
+| Neue ADRs | 56 (Turnier-Einsatz) · 57 (Turniergrenze) · 58 (Heimweg) · 59 (Auftakt immer) |
+| Korrigiert | ADR-11 — die Begründung war falsch |
+| Entfallen | `SessionStore.resetRounds()`, `IntroMode`/`'short'` |
+| Kosten | ~5 s Auftakt pro Runde statt nur in der ersten |
+
+**Manuelle Checks, die Luka bestätigen muss:**
+- [ ] **Stört der Auftakt ab Runde 2?** Fünf Sekunden pro Runde sind bei einem schnellen
+      Abend spürbar. Wenn es zu viel wird, ist die Kurzfassung ab Runde 3 die naheliegende
+      Stellschraube — der Code dafür ist eine Zeile.
+- [ ] **Das ✕ in der Arena** — zurückhaltend genug, oder zieht es Blicke von der Show ab?
+- [ ] **Sudden Death über vier Runden ohne Nachsetzen:** Trägt das die Spannung, oder
+      fehlt zwischendrin der Einsatz-Moment?
+- [ ] **Mit „Bewegung reduzieren"** im System: Schütze sichtbar, Schnitt statt Fahrt, kein
+      Wackeln beim Warnschuss.

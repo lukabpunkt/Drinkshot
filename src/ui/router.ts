@@ -28,7 +28,7 @@ export interface ScreenContext {
   session: SessionStore;
   router: Router;
   dev: boolean;
-  /** Fragt "Runde abbrechen?" und führt bei Ja zurück in die Lobby (ADR-55). */
+  /** Fragt "Runde abbrechen?" und führt bei Ja zurück in die Lobby (ADR-58). */
   abortRound: () => void;
 }
 

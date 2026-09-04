@@ -322,9 +322,7 @@ test('Showdown markiert niemanden in der Lobby als ausgeschieden', async ({ page
   await expect(page.locator('.lobby__row')).toHaveCount(3);
 });
 
-test('Intro: die erste Runde bekommt den Auftakt, die zweite nur den Kurzteil', async ({
-  page,
-}) => {
+test('Intro: jede Runde bekommt den vollen Auftakt', async ({ page }) => {
   test.setTimeout(240_000);
 
   await enterArena(page, '?dev=1', 2, { sound: false, duration: 'short' });
@@ -349,12 +347,33 @@ test('Intro: die erste Runde bekommt den Auftakt, die zweite nur den Kurzteil', 
   console.log(`Runde 1 ${first} ms · Runde 2 ${second} ms (bis zum Schuss)`);
 
   /*
-   * Der Unterschied ist der Schütze plus die Fahrt plus die Blende — gut fünf Sekunden.
-   * Grosszügig geprüft, weil beide Runden dieselbe Show-Länge haben und nur der Auftakt
-   * sich unterscheidet.
+   * Frueher lief der Auftakt nur in der ersten Runde — und weil `roundNumber` nirgends
+   * zurueckgesetzt wurde, danach bis zum Neuladen der Seite nie wieder (ADR-56). Beide
+   * Runden haben dieselbe Show-Laenge, also darf sich nur noch Messrauschen unterscheiden.
    */
-  expect(first - second).toBeGreaterThan(3_000);
-  expect(first - second).toBeLessThan(9_000);
+  expect(Math.abs(first - second)).toBeLessThan(3_000);
+  // Und der Auftakt ist auch wirklich drin: unter 5 s ginge das nicht.
+  expect(second).toBeGreaterThan(8_000);
+});
+
+test('Intro: ein Streifen in den ersten Millisekunden loescht den Auftakt nicht', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+
+  await enterArena(page, '?dev=1', 2, { sound: false, duration: 'short' });
+
+  /*
+   * Der READY-Screen fordert auf, das Handy hinzulegen — wer das tut, streift den Schirm.
+   * Ohne Karenzzeit war der Skip-Handler schon waehrend des Wipes scharf und der Schuetze
+   * damit weg, noch bevor man ihn gesehen hatte (ADR-56).
+   */
+  await page.locator('.screen--arena').click({ position: { x: 100, y: 300 } });
+
+  // Der Auftakt laeuft weiter: Bis zum Schuss vergehen weiterhin ueber acht Sekunden.
+  const started = Date.now();
+  await expect(page.locator('.arena__skip')).toBeVisible({ timeout: 90_000 });
+  expect(Date.now() - started).toBeGreaterThan(8_000);
 });
 
 test('Intro: ein Tipp springt zur Show, nicht ins Ergebnis', async ({ page }) => {
@@ -362,7 +381,13 @@ test('Intro: ein Tipp springt zur Show, nicht ins Ergebnis', async ({ page }) =>
 
   await enterArena(page, '?dev=1', 3, { sound: false, duration: 'short' });
 
-  // Mitten in der Frontalansicht antippen.
+  /*
+   * Erst nach der Karenzzeit tippen (`INTRO.armMs`, 700 ms) — davor ist der Skip
+   * absichtlich taub, sonst loescht ein Streifen den Auftakt. Der Schuetze steht drei
+   * Sekunden, hier landet der Tipp also mitten in der Frontalansicht.
+   */
+  await expect(page.locator('.arena__hud')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1_200);
   await page.locator('.screen--arena').click({ position: { x: 100, y: 300 } });
 
   /*

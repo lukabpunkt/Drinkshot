@@ -10,7 +10,7 @@ import { ARENA, shotlingHeightFor } from '@/config/theme';
 import { HEARTBEAT } from '@/config/choreo';
 import { buildShowScript } from '@/core/choreographer';
 import { INTRO } from '@/config/choreo';
-import { IntroSequence, type IntroMode } from '@/game/IntroSequence';
+import { IntroSequence } from '@/game/IntroSequence';
 import { lineupPositions, warningShotPoint } from '@/game/introLineup';
 import { createSeededRng } from '@/core/rng';
 import { t } from '@/core/i18n';
@@ -209,23 +209,22 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   let warningShot = { x: 0, y: 0 };
 
   /*
-   * Wie viel Auftakt? Die volle Inszenierung nur in der **ersten** Runde einer Session —
-   * ein siebensekündiger Vorspann vor jeder Runde wäre am achten Abend nur Wartezeit.
+   * Der Auftakt läuft in **jeder** Runde (ADR-56).
    *
-   * Der Auslöser ist `roundNumber`, bewusst **kein** persistentes Flag: Der E2E-Test
-   * „Kurz vs. Lang" misst zweimal in derselben Seite und leert localStorage nur beim
-   * ersten Laden — ein Flag gäbe der ersten Messung die volle Inszenierung und der
-   * zweiten nur den Kurzteil, und die gemessene Differenz bräche ein.
+   * Vorher hing er an `roundNumber === 0`. Das war als „erste Runde einer Session"
+   * gedacht, umgesetzt war es „erste Runde pro Seitenladung": `roundNumber` wurde
+   * nirgends zurückgesetzt, also blieb der Schütze auch in einer komplett neuen Partie
+   * weg. Und „Bewegung reduzieren" strich ihn ganz — auf manchen Android-Geräten schaltet
+   * das der Akkusparmodus ungefragt mit ein, der Auftakt verschwand also mitten am Abend.
+   *
+   * Bei reduzierter Bewegung bleibt er sichtbar, nur ohne Kamerafahrt und ohne Wackeln;
+   * das entscheidet `IntroSequence` selbst.
    *
    * In den Dev-Modi bleibt der Auftakt ganz aus: `?hold=1` misst Draw-Calls und
    * Frame-Zeiten, `?panel=deaths` beurteilt einzelne Sequenzen — beides würde die
    * Inszenierung verfälschen.
    */
-  const introMode: IntroMode | 'none' = isHoldMode(ctx.dev)
-    ? 'none'
-    : prefersReducedMotion() || ctx.fsm.context.roundNumber > 0
-      ? 'short'
-      : 'full';
+  const playIntro = !isHoldMode(ctx.dev);
 
   /**
    * Während der Inszenierung springt ein Tipp irgendwohin ans Ende — ohne sichtbaren
@@ -235,7 +234,18 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
    * landete im Result einer Runde, deren Show nie lief.
    */
   function armIntroSkip(skip: () => void): void {
+    /*
+     * Karenzzeit, sonst löscht ein Streifen den Auftakt.
+     *
+     * Der Handler liegt auf dem ganzen Bildschirm und war ~200 ms nach „Los!" scharf —
+     * noch während des Wipes, der `pointer-events: none` hat und also nichts abschirmt.
+     * Der READY-Screen fordert unmittelbar davor auf, das Handy hinzulegen: Wer das tut,
+     * streift den Schirm und war um den Schützen gebracht. PASS und READY schützen sich
+     * seit je mit derselben Sperre.
+     */
+    const armedAt = performance.now() + INTRO.armMs;
     onIntroTap = (event) => {
+      if (performance.now() < armedAt) return;
       // Der Skip-Knopf der Show hat seinen eigenen Handler.
       if ((event.target as HTMLElement | null)?.closest('button')) return;
       skip();
@@ -258,11 +268,13 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
    */
   const onVisibility = (): void => {
     if (document.hidden) {
+      intro?.pause();
       director?.pause();
       audio.suspendAudio();
     } else {
       audio.resumeAudio();
       director?.resume();
+      intro?.resume();
     }
   };
   document.addEventListener('visibilitychange', onVisibility);
@@ -452,7 +464,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
      * sich nicht. `frozen` statt `speedMultiplier = 0`, weil `resolveOverlaps` die enge
      * Reihe sonst jeden Frame auseinanderdrückte.
      */
-    if (introMode !== 'none') {
+    if (playIntro) {
       const lineup = lineupPositions({
         count: brains.length,
         height,
@@ -586,7 +598,8 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
         if (final) skip.hidden = false;
       },
       // Die Blende hat den Sound schon gespielt — der Beat würde ihn sonst wiederholen.
-      playIntroCue: introMode === 'none',
+      // Ohne Auftakt spielt der Director den `scope_open`-Cue selbst.
+      playIntroCue: !playIntro,
       onLockEngaged: () => {
         startLockPulse();
         /*
@@ -685,7 +698,7 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       show.play();
     };
 
-    if (introMode === 'none') {
+    if (!playIntro) {
       startShow();
       return;
     }
@@ -699,7 +712,6 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       warningShot,
       lowEffects,
       reducedMotion: prefersReducedMotion(),
-      mode: introMode,
       onScatter: () => {
         for (const brain of brains) {
           brain.frozen = false;

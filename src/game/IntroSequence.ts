@@ -40,7 +40,7 @@ export interface IntroSequenceOptions {
   /** Taut die Männchen auf und lässt sie losstieben. */
   onScatter: () => void;
   lowEffects: boolean;
-  /** Bei „Bewegung reduzieren": kein Push, keine Kamerawackler. */
+  /** Bei „Bewegung reduzieren": Schnitt statt Kamerafahrt, keine Kamerawackler. */
   reducedMotion: boolean;
   /**
    * `full` zeigt den Schützen, `short` beginnt direkt bei der Reihe.
@@ -49,10 +49,7 @@ export interface IntroSequenceOptions {
    * er läuft in **jeder** Runde ab der zweiten, und fünf Sprites plus zwei Graphics für
    * etwas, das nie sichtbar wird, wären jedes Mal umsonst.
    */
-  mode: IntroMode;
 }
-
-export type IntroMode = 'full' | 'short';
 
 /** Der Linsen-Innenradius im lokalen Maßstab — alles andere skaliert dagegen. */
 const LENS_R = INTRO.lensRadiusPx;
@@ -81,12 +78,6 @@ export class IntroSequence {
 
     this.layer.eventMode = 'none';
     options.overlay.addChildAt(this.layer, 0);
-
-    if (options.mode !== 'full') {
-      // Der Kurzteil braucht keine Bühne — nur die Beats.
-      this.layer.visible = false;
-      return;
-    }
 
     this.buildSniper();
 
@@ -154,7 +145,6 @@ export class IntroSequence {
 
   /** Muss bei jedem Layout-Wechsel gerufen werden. */
   resize(): void {
-    if (this.options.mode !== 'full') return;
     const { scope } = this.options;
     const width = scope.centerX * 2;
     const height = scope.centerY * 2;
@@ -177,45 +167,58 @@ export class IntroSequence {
 
   /** Baut die Timeline für den gewählten Modus. */
   build(): gsap.core.Timeline {
-    const { camera, particles, warningShot, onScatter, reducedMotion, mode } = this.options;
+    const { camera, particles, warningShot, onScatter, reducedMotion } = this.options;
     const timeline = gsap.timeline({ paused: true });
     this.timeline = timeline;
 
-    if (mode === 'full') {
-      this.layer.visible = true;
-      /*
-       * Der Scope ist ab dem ersten Frame vollständig gezeichnet. Während man den
-       * Schützen von vorne sieht, schaut man aber nicht hindurch — sonst läge das
-       * Fadenkreuz über seinem Gesicht.
-       */
-      this.options.scope.view.visible = false;
-      timeline.to({}, { duration: INTRO.sniperHoldMs / 1000 });
+    this.layer.visible = true;
+    /*
+     * Der Scope ist ab dem ersten Frame vollständig gezeichnet. Während man den
+     * Schützen von vorne sieht, schaut man aber nicht hindurch — sonst läge das
+     * Fadenkreuz über seinem Gesicht.
+     */
+    this.options.scope.view.visible = false;
+    timeline.to({}, { duration: INTRO.sniperHoldMs / 1000 });
 
-      /* --- Die Fahrt in die Linse --- */
+    /*
+     * Die Fahrt in die Linse — bei „Bewegung reduzieren" ein harter Schnitt.
+     *
+     * Der Schütze bleibt dabei sichtbar (ADR-56). Vorher fiel der ganze Auftakt weg,
+     * sobald die Systemeinstellung gesetzt war; jetzt entfällt nur die Bewegung.
+     */
+    if (reducedMotion) {
+      timeline.call(() => {
+        this.progress.value = 1;
+        this.applyPush();
+      });
+    } else {
       timeline.to(this.progress, {
         value: 1,
         duration: INTRO.pushMs / 1000,
         ease: 'power2.in',
         onUpdate: () => this.applyPush(),
       });
-
-      /* --- Blende auf: die Scheibe schrumpft, der Hintergrund verschwindet --- */
-      const iris = CHOREO.introIrisMs / 1000;
-      timeline.call(() => audio.play('scope_open'), undefined, 'iris');
-      timeline.to(this.irisDisc.scale, { x: 0, y: 0, duration: iris, ease: 'back.in(1.4)' }, 'iris');
-      timeline.to(this.backdrop, { alpha: 0, duration: iris }, 'iris');
-      timeline.to(this.sniper, { alpha: 0, duration: iris * 0.7 }, 'iris');
-      timeline.to(this.lensRing, { alpha: 0, duration: iris * 0.8 }, `iris+=${iris * 0.2}`);
-      timeline.call(() => {
-        this.layer.visible = false;
-      });
-      // Die Blende gibt den Blick frei — ab hier schaut man durch sein Zielfernrohr.
-      timeline.call(() => {
-        this.options.scope.view.visible = true;
-      }, undefined, 'iris');
-    } else {
-      this.layer.visible = false;
     }
+
+    /* --- Blende auf: die Scheibe schrumpft, der Hintergrund verschwindet --- */
+    // Die Blende ist eine reine Deckkraft-Blende, also auch bei reduzierter Bewegung ok.
+    const iris = CHOREO.introIrisMs / 1000;
+    timeline.call(() => audio.play('scope_open'), undefined, 'iris');
+    timeline.to(this.irisDisc.scale, { x: 0, y: 0, duration: iris, ease: 'back.in(1.4)' }, 'iris');
+    timeline.to(this.backdrop, { alpha: 0, duration: iris }, 'iris');
+    timeline.to(this.sniper, { alpha: 0, duration: iris * 0.7 }, 'iris');
+    timeline.to(this.lensRing, { alpha: 0, duration: iris * 0.8 }, `iris+=${iris * 0.2}`);
+    timeline.call(() => {
+      this.layer.visible = false;
+    });
+    // Die Blende gibt den Blick frei — ab hier schaut man durch sein Zielfernrohr.
+    timeline.call(
+      () => {
+        this.options.scope.view.visible = true;
+      },
+      undefined,
+      'iris'
+    );
 
     /* --- Die Reihe steht, das Fadenkreuz sucht sie ab --- */
     timeline.to({}, { duration: INTRO.rowHoldMs / 1000 });

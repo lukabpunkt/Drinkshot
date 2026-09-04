@@ -136,8 +136,15 @@ export const INTRO = {
 
   /** Abstand zweier Maennchen in der Reihe, als Anteil ihrer Hoehe. */
   rowSpacingFactor: 0.55,
-  /** Tiefenversatz zwischen vorderer und hinterer Reihe (ab 7 Spielern). */
-  rowDepthFactor: 0.42,
+  /**
+   * Tiefenversatz zwischen vorderer und hinterer Reihe (ab 7 Spielern).
+   *
+   * Der Kopf ist 0,406 der Hoehe hoch — bei geringerem Versatz schauen die Hinteren nur
+   * noch mit dem Haaransatz ueber die Vorderen. 0,55 laesst 29 Welteinheiten Luft, also
+   * Kopf und ein Stueck Schulter. Kostet nichts: Der aeusserste Fusspunkt liegt damit auf
+   * Radius 200 von 351.
+   */
+  rowDepthFactor: 0.55,
   /**
    * Wie weit die Reihe hoechstens aus der Mitte reichen darf, als Anteil des Laufradius.
    * Nicht 1.0: Ab 0.9 lenkt der Brain vom Rand weg, und beim Auftauen risse

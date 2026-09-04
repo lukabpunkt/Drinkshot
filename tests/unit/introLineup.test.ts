@@ -115,7 +115,13 @@ describe('lineupPositions', () => {
 
       const backHeadBottom = back.y - headCenter + headHeight / 2;
       const frontHeadTop = front.y - headCenter - headHeight / 2;
-      expect(backHeadBottom).toBeLessThan(frontHeadTop);
+
+      /*
+       * Nicht nur „überhaupt frei": Bei drei Welteinheiten Luft — dem ersten Entwurf —
+       * schaute die hintere Reihe nur mit dem Haaransatz hervor. Ein Zehntel der Höhe
+       * lässt Kopf und ein Stück Schulter sehen.
+       */
+      expect(frontHeadTop - backHeadBottom).toBeGreaterThan(height * 0.1);
     }
   });
 

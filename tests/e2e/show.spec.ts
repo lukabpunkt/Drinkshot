@@ -7,6 +7,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { betAllAndStart, enterLobby, prepare } from './helpers';
 
 /*
  * Diese Tests messen echte Wartezeiten einer 10–22 s langen Show. Die Reihenfolge ist
@@ -36,34 +37,18 @@ async function isSoftwareRenderer(page: Page): Promise<boolean> {
   return /swiftshader|llvmpipe|software/i.test(renderer);
 }
 
-async function tapPass(page: Page): Promise<void> {
-  const pass = page.locator('.screen--pass');
-  await pass.waitFor({ timeout: 20_000 });
-  await expect(pass).not.toHaveClass(/is-locked/, { timeout: 8_000 });
-  await pass.click();
-  await page.locator('.screen--bet').waitFor({ timeout: 20_000 });
-}
-
 /** Spielt bis in die Arena. `query` hängt Dev-Parameter an. */
-async function enterArena(page: Page, query = '', players = PLAYERS): Promise<void> {
-  await page.addInitScript(() => {
-    window.localStorage.clear();
-    window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
-  });
+async function enterArena(
+  page: Page,
+  query = '',
+  players = PLAYERS,
+  settings?: Record<string, unknown>
+): Promise<void> {
+  await prepare(page, settings);
   await page.goto(`./${query}`);
-
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < players) await add.click();
+  await enterLobby(page, players);
   await page.getByRole('button', { name: "Los geht's!" }).click();
-
-  for (let i = 0; i < players; i++) {
-    await tapPass(page);
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-    if (await page.locator('.screen--arena').count()) break;
-  }
-  await page.locator('.screen--arena').waitFor({ timeout: 20_000 });
-  await expect(page.locator('.screen--arena')).not.toHaveClass(/is-loading/, { timeout: 20_000 });
+  await betAllAndStart(page, { players });
 }
 
 test('die Show läuft durch und endet im Result', async ({ page }) => {
@@ -83,33 +68,21 @@ test('Dauer-Preset "Kurz" ist deutlich kürzer als "Lang"', async ({ page }) => 
   test.setTimeout(240_000);
 
   const measure = async (option: RegExp): Promise<number> => {
-    await page.addInitScript(() => {
-      window.localStorage.clear();
-      window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
-    });
+    await prepare(page);
     await page.goto('./');
     await page.getByRole('button', { name: 'Einstellungen' }).click();
     await page.getByRole('dialog').getByRole('radio', { name: option }).click();
     await page.locator('.sheet__close').click();
     await expect(page.locator('.sheet')).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Spielen' }).click();
-    const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-    while ((await page.locator('.lobby__row').count()) < 2) await add.click();
+    await enterLobby(page, 2);
     await page.getByRole('button', { name: "Los geht's!" }).click();
-    for (let i = 0; i < 2; i++) {
-      await tapPass(page);
-      await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-    }
-    await page.locator('.screen--arena').waitFor({ timeout: 30_000 });
     /*
-     * Erst warten, bis die Atlanten stehen. Beim ersten Durchlauf werden sie hier noch
-     * geladen — läuft das in die Messung hinein, ist die erste Messung um die Ladezeit
-     * zu lang und die Differenz stimmt nicht mehr.
+     * `betAllAndStart` wartet, bis die Atlanten stehen. Beim ersten Durchlauf werden sie
+     * dort noch geladen — liefe das in die Messung hinein, wäre die erste Messung um die
+     * Ladezeit zu lang und die Differenz stimmte nicht mehr.
      */
-    await expect(page.locator('.screen--arena')).not.toHaveClass(/is-loading/, {
-      timeout: 30_000,
-    });
+    await betAllAndStart(page, { players: 2 });
     const started = Date.now();
     /*
      * Bis zum **Schuss** messen, nicht bis zum Result.
@@ -198,14 +171,9 @@ test('stumm komplett spielbar (Audit A3)', async ({ page }) => {
   });
   await page.goto('./');
 
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < 2) await add.click();
+  await enterLobby(page, 2);
   await page.getByRole('button', { name: "Los geht's!" }).click();
-  for (let i = 0; i < 2; i++) {
-    await tapPass(page);
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-  }
+  await betAllAndStart(page, { players: 2 });
 
   await expect(page.locator('.screen--result')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.result__headline')).toContainText('trinkt');
@@ -258,17 +226,9 @@ test('Double Tap: zwei Opfer, zwei Schüsse, beide trinken (Audit A5)', async ({
   // Kurzes Preset: Der Nachschlag hängt hinten dran, die Runde wird ohnehin länger.
   await page.goto('./?dev=1');
 
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < PLAYERS) await add.click();
+  await enterLobby(page, PLAYERS);
   await page.getByRole('button', { name: "Los geht's!" }).click();
-
-  for (let i = 0; i < PLAYERS; i++) {
-    await tapPass(page);
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-    if (await page.locator('.screen--arena').count()) break;
-  }
-  await page.locator('.screen--arena').waitFor({ timeout: 20_000 });
+  await betAllAndStart(page, { players: PLAYERS });
 
   await expect(page.locator('.screen--result')).toBeVisible({ timeout: 120_000 });
 

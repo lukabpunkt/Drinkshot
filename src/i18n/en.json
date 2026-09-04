@@ -60,6 +60,12 @@
     },
     "blind": "Bet placed blind. Good luck."
   },
+  "ready": {
+    "headline": "Everyone's in",
+    "putDown": "Put the phone in the middle",
+    "players": "{count} players in",
+    "start": "Go!"
+  },
   "arena": {
     "hud": "ROUND {round} · {count} TARGETS",
     "lock": "LOCK",

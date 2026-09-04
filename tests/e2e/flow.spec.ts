@@ -6,13 +6,9 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { ARENA_TIMEOUT, betAllAndStart } from './helpers';
 
 const PLAYERS = ['Rudi', 'Blue', 'Gustav', 'Yoshi'];
-/**
- * Die Show dauert 15 s plus Todesanimation und Wipes. Auf einem Runner ohne GPU klemmt
- * PIXI lange Frames ab und die Show läuft gedehnt — deshalb reichlich Luft.
- */
-const ARENA_TIMEOUT = 60_000;
 
 /** Sammelt Console-Errors; A1 fordert einen Flow ohne sie. */
 function watchErrors(page: Page): string[] {
@@ -68,23 +64,7 @@ async function storedNames(page: Page): Promise<string> {
 
 /** Spielt eine komplette Betting-Phase durch und wartet auf den Result-Screen. */
 async function playRound(page: Page, bets: number[]): Promise<void> {
-  for (const bet of bets) {
-    await expect(page.locator('.screen--pass')).toBeVisible();
-    // 800-ms-Sperre abwarten, dann tippen.
-    await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
-    await page.locator('.screen--pass').click();
-
-    await expect(page.locator('.screen--bet')).toBeVisible();
-    const current = Number(await page.locator('.stepper__value').textContent());
-    const delta = bet - current;
-    const stepButton = page.getByRole('button', { name: delta > 0 ? 'Einsatz erhöhen' : 'Einsatz senken' });
-    for (let i = 0; i < Math.abs(delta); i++) await stepButton.click();
-    await expect(page.locator('.stepper__value')).toHaveText(String(bet));
-
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-  }
-
-  await expect(page.locator('.screen--arena')).toBeVisible();
+  await betAllAndStart(page, { bets });
   await expect(page.locator('.screen--result')).toBeVisible({ timeout: ARENA_TIMEOUT });
 }
 
@@ -154,6 +134,41 @@ test('Einsatz ist nach dem Bestätigen nirgends mehr sichtbar', async ({ page })
   await expect(page.locator('.screen--pass')).toBeVisible();
   await expect(page.locator('.stepper__value')).toHaveCount(0);
   await expect(page.locator('.screen--pass')).not.toContainText('4');
+
+  /*
+   * Und auch der Start-Screen verrät nichts. Er ist die neue Stelle, an der man das
+   * brechen könnte: Er kennt alle Einsätze und steht nach dem letzten Bestätigen.
+   */
+  await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
+  await page.locator('.screen--pass').click();
+  await page.getByRole('button', { name: 'Einsatz senken' }).click(); // 3 → 2
+  await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+
+  const ready = page.locator('.screen--ready');
+  await expect(ready).toBeVisible();
+  await expect(page.locator('.stepper__value')).toHaveCount(0);
+  // Keine der gesetzten Zahlen steht auf dem Screen — auch nicht in einer Summe (6).
+  const text = (await ready.innerText()).replace(/\d+ von \d+/g, '');
+  expect(text).not.toMatch(/\b(2|4|6)\b/);
+});
+
+test('Start-Screen ist per Tastatur bedienbar', async ({ page }) => {
+  await freshStart(page);
+  await setUpLobby(page, ['Anna', 'Ben']);
+  await page.getByRole('button', { name: "Los geht's!" }).click();
+
+  for (let i = 0; i < 2; i++) {
+    await expect(page.locator('.screen--pass')).not.toHaveClass(/is-locked/, { timeout: 4000 });
+    await page.locator('.screen--pass').click();
+    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+  }
+
+  const ready = page.locator('.screen--ready');
+  await expect(ready).not.toHaveClass(/is-locked/, { timeout: 4000 });
+  // Nach dem Entsperren liegt der Fokus auf dem Start-Knopf — Enter reicht.
+  await expect(page.getByRole('button', { name: 'Los!' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.screen--arena')).toBeVisible({ timeout: 20_000 });
 });
 
 test('Privacy-Screen blockiert Taps 800 ms lang', async ({ page }) => {

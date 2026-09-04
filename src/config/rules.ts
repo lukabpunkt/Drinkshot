@@ -95,6 +95,16 @@ export const DEATH_NO_REPEAT_MIN_POOL = 8;
 /** Tap-Sperre auf dem Pass-Screen gegen Doppeltaps (GDD §6). */
 export const PASS_TAP_LOCK_MS = 800;
 
+/**
+ * Wie lange der Start-Knopf auf dem READY-Screen taub bleibt.
+ *
+ * Er sitzt an derselben Stelle wie das "Bestaetigen & verstecken" davor — ohne Sperre
+ * reicht ein Doppeltap durch und die Show startet, bevor das Handy in der Mitte liegt.
+ * Kuerzer als `PASS_TAP_LOCK_MS`: Der Wipe hat schon 320 ms verbraucht, und der Knopf
+ * soll sich nicht tot anfuehlen.
+ */
+export const READY_ARM_MS = 400;
+
 /** Long-Press-Auto-Repeat im Bet-Stepper (Art Direction §4.3). */
 export const STEPPER_REPEAT_MS = { initial: 300, interval: 90 } as const;
 

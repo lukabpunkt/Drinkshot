@@ -26,6 +26,7 @@ import type * as ArenaScreenModule from '@/ui/screens/ArenaScreen';
 import { createBetScreen } from '@/ui/screens/BetScreen';
 import { createLobbyScreen } from '@/ui/screens/LobbyScreen';
 import { createPassScreen } from '@/ui/screens/PassScreen';
+import { createReadyScreen } from '@/ui/screens/ReadyScreen';
 import { createResultScreen } from '@/ui/screens/ResultScreen';
 import { createTitleScreen } from '@/ui/screens/TitleScreen';
 
@@ -115,6 +116,7 @@ router.register('title', createTitleScreen);
 router.register('lobby', createLobbyScreen);
 router.register('pass', createPassScreen);
 router.register('bet', createBetScreen);
+router.register('ready', createReadyScreen);
 /*
  * Die Arena wird **nachgeladen**: PIXI, GSAP, die Filter und alle dreizehn
  * Todesanimationen machen den grössten Teil des Codes aus, werden aber erst gebraucht,
@@ -177,6 +179,7 @@ const SCREEN_FOR_STATE: Record<GameState, ScreenId> = {
   LOBBY: 'lobby',
   PASS: 'pass',
   BET: 'bet',
+  READY: 'ready',
   ARENA: 'arena',
   RESULT: 'result',
 };
@@ -217,13 +220,15 @@ fsm.on('LOBBY', {
   },
 });
 
-fsm.on('PASS', {
-  enter: () => {
-    void loadArenaScreen()
-      .then((module) => module.preloadArena())
-      .catch(() => undefined);
-  },
-});
+const preloadAtlases = (): void => {
+  void loadArenaScreen()
+    .then((module) => module.preloadArena())
+    .catch(() => undefined);
+};
+
+fsm.on('PASS', { enter: preloadAtlases });
+// Letzter Puffer: Wer hier steht, ist einen Tap von der Arena entfernt.
+fsm.on('READY', { enter: preloadAtlases });
 
 fsm.subscribe(({ to, event }) => {
   void router.go(SCREEN_FOR_STATE[to], {
@@ -238,7 +243,7 @@ fsm.subscribe(({ to, event }) => {
 /* ------------------------------------------------------------------ */
 
 /** In diesen States kostet ein Zurück die laufende Runde — also erst fragen. */
-const GUARDED: ReadonlySet<GameState> = new Set<GameState>(['PASS', 'BET', 'ARENA']);
+const GUARDED: ReadonlySet<GameState> = new Set<GameState>(['PASS', 'BET', 'READY', 'ARENA']);
 
 let guarded = false;
 let dialogOpen = false;
@@ -340,6 +345,8 @@ function startDeathPreview(): boolean {
     fsm.send({ type: 'tap' });
     fsm.send({ type: 'confirm', sips: 3 });
   }
+  // Seit dem Start-Screen endet die Confirm-Schleife in READY, nicht in der Arena.
+  fsm.send({ type: 'startShow' });
   return true;
 }
 

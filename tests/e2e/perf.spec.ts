@@ -9,6 +9,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { betAllAndStart, enterLobby, prepare } from './helpers';
 
 const PLAYERS = 8;
 const SAMPLE_MS = 10_000;
@@ -43,29 +44,15 @@ function percentile(sorted: readonly number[], p: number): number {
 
 /** Spielt sich bis in die Arena durch; `hold=1` hält sie danach offen. */
 async function enterArena(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.localStorage.clear();
-    window.localStorage.setItem('drinkshot.disclaimer.v1', '1');
-  });
+  await prepare(page);
   await page.goto('./?dev=1&hold=1');
 
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < PLAYERS) await add.click();
+  await enterLobby(page, PLAYERS);
   await page.getByRole('button', { name: "Los geht's!" }).click();
+  await betAllAndStart(page, { players: PLAYERS });
 
-  for (let i = 0; i < PLAYERS; i++) {
-    const pass = page.locator('.screen--pass');
-    await pass.waitFor({ timeout: 15_000 });
-    await expect(pass).not.toHaveClass(/is-locked/, { timeout: 5_000 });
-    await pass.click();
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
-  }
-
-  await page.locator('.screen--arena').waitFor({ timeout: 15_000 });
-  // Warten, bis die Atlanten stehen, der erste Frame gerendert ist und die
-  // Low-Effects-Messung (2 s) durch ist — sonst misst man die Anlaufphase mit.
-  await expect(page.locator('.screen--arena')).not.toHaveClass(/is-loading/, { timeout: 20_000 });
+  // Warten, bis der erste Frame gerendert ist und die Low-Effects-Messung (2 s) durch
+  // ist — sonst misst man die Anlaufphase mit.
   await page.waitForTimeout(2500);
 }
 

@@ -6,6 +6,7 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { enterLobby, placeBet, startShow, tapPass } from './helpers';
 
 /**
  * Frischer Start auf dem Titelbild.
@@ -200,18 +201,14 @@ test('fehlender Atlas fuehrt zu Toast und nicht in die Sackgasse (Audit A5)', as
   await page.route('**/atlas/**', (route) => route.abort('failed'));
   await page.goto('./');
 
-  await page.getByRole('button', { name: 'Spielen' }).click();
-  const add = page.getByRole('button', { name: 'Spieler hinzufügen' });
-  while ((await page.locator('.lobby__row').count()) < 2) await add.click();
+  await enterLobby(page, 2);
   await page.getByRole('button', { name: "Los geht's!" }).click();
 
   for (let i = 0; i < 2; i++) {
-    const pass = page.locator('.screen--pass');
-    await pass.waitFor({ timeout: 20_000 });
-    await expect(pass).not.toHaveClass(/is-locked/, { timeout: 8000 });
-    await pass.click();
-    await page.getByRole('button', { name: 'Bestätigen & verstecken' }).click();
+    await tapPass(page);
+    await placeBet(page);
   }
+  await startShow(page);
 
   // Meldung statt schwarzem Bild …
   await expect(page.locator('.toast--danger')).toBeVisible({ timeout: 30_000 });

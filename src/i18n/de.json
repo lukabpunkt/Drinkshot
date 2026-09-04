@@ -60,6 +60,12 @@
     },
     "blind": "Blind gesetzt. Viel Glück."
   },
+  "ready": {
+    "headline": "Alle haben gesetzt",
+    "putDown": "Legt das Handy in die Mitte",
+    "players": "{count} Spieler dabei",
+    "start": "Los!"
+  },
   "arena": {
     "hud": "RUNDE {round} · {count} ZIELE",
     "lock": "LOCK",

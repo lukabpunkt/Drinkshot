@@ -29,18 +29,23 @@ function makeFsm(players = PLAYERS): Fsm {
 }
 
 /** Spielt bis zum gewuenschten State durch. */
-function advanceTo(fsm: Fsm, target: 'LOBBY' | 'PASS' | 'BET' | 'ARENA' | 'RESULT'): Fsm {
+function advanceTo(
+  fsm: Fsm,
+  target: 'LOBBY' | 'PASS' | 'BET' | 'READY' | 'ARENA' | 'RESULT'
+): Fsm {
   fsm.send({ type: 'start' });
   if (target === 'LOBBY') return fsm;
   fsm.send({ type: 'begin' });
   if (target === 'PASS') return fsm;
   fsm.send({ type: 'tap' });
   if (target === 'BET') return fsm;
-  // Alle Spieler setzen
+  // Alle Spieler setzen — endet in READY, nicht mehr direkt in der Arena.
   for (let i = 0; i < PLAYERS.length; i++) {
     fsm.send({ type: 'confirm', sips: 3 });
     if (fsm.state === 'PASS') fsm.send({ type: 'tap' });
   }
+  if (target === 'READY') return fsm;
+  fsm.send({ type: 'startShow' });
   if (target === 'ARENA') return fsm;
   fsm.send({ type: 'showFinished' });
   return fsm;
@@ -154,6 +159,7 @@ describe('FSM — unzulaessige Events', () => {
     { type: 'nextRound' },
     { type: 'changePlayers' },
     { type: 'cancel' },
+    { type: 'startShow' },
   ];
 
   const ALLOWED: Record<string, string[]> = {
@@ -161,6 +167,7 @@ describe('FSM — unzulaessige Events', () => {
     LOBBY: ['begin'],
     PASS: ['tap', 'cancel'],
     BET: ['confirm', 'cancel'],
+    READY: ['startShow', 'cancel'],
     ARENA: ['showFinished', 'cancel'],
     RESULT: ['nextRound', 'changePlayers'],
   };
@@ -285,6 +292,11 @@ describe('FSM — Setter', () => {
     fsm.send({ type: 'confirm', sips: 1 });
     fsm.send({ type: 'tap' });
     fsm.send({ type: 'confirm', sips: 2 });
+    // Der letzte Einsatz fuehrt nach READY — gezogen wird erst beim Start (ADR-42).
+    expect(fsm.state).toBe('READY');
+    expect(draw).not.toHaveBeenCalled();
+
+    fsm.send({ type: 'startShow' });
     expect(draw).toHaveBeenCalledTimes(1);
     expect(draw).toHaveBeenCalledWith(
       [
@@ -309,6 +321,8 @@ describe('FSM — Ziehung genau einmal (ADR-2)', () => {
       fsm.send({ type: 'confirm', sips: 2 });
       fsm.send({ type: 'tap' });
       fsm.send({ type: 'confirm', sips: 3 });
+      expect(fsm.state).toBe('READY');
+      fsm.send({ type: 'startShow' });
       expect(fsm.state).toBe('ARENA');
       expect(draw).toHaveBeenCalledTimes(round);
       fsm.send({ type: 'showFinished' });
@@ -325,8 +339,34 @@ describe('FSM — Ziehung genau einmal (ADR-2)', () => {
     fsm.send({ type: 'confirm', sips: 5 });
     fsm.send({ type: 'tap' });
     fsm.send({ type: 'confirm', sips: 5 });
+    fsm.send({ type: 'startShow' });
     expect(fsm.state).toBe('ARENA');
     expect(['a', 'b']).toContain(fsm.context.round?.victimId);
     expect(fsm.drawCount).toBe(1);
+  });
+
+  it('wer aus READY abbricht, hat nie gezogen', () => {
+    const draw = vi.fn(fakeDraw);
+    const fsm = createFsm({ players: ['a', 'b'], drawRound: draw });
+    advanceTo(fsm, 'READY');
+
+    expect(fsm.context.round).toBeNull();
+    fsm.send({ type: 'cancel' });
+
+    expect(fsm.state).toBe('LOBBY');
+    expect(draw).not.toHaveBeenCalled();
+    expect(fsm.drawCount).toBe(0);
+    // Der Abbruch raeumt die Einsaetze weg, sonst laegen sie in der naechsten Runde noch da.
+    expect(fsm.context.bets).toEqual([]);
+  });
+
+  it('READY haelt die Einsaetze, bis der Start kommt', () => {
+    const fsm = makeFsm();
+    advanceTo(fsm, 'READY');
+    expect(fsm.context.bets).toHaveLength(PLAYERS.length);
+    expect(fsm.context.round).toBeNull();
+
+    fsm.send({ type: 'startShow' });
+    expect(fsm.context.round).not.toBeNull();
   });
 });

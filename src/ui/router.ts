@@ -11,7 +11,7 @@ import { MOTION, hex, UI_COLORS } from '@/config/theme';
 import type { Fsm } from '@/core/fsm';
 import type { SessionStore } from '@/core/session';
 
-export const SCREEN_ORDER = ['title', 'lobby', 'pass', 'bet', 'arena', 'result'] as const;
+export const SCREEN_ORDER = ['title', 'lobby', 'pass', 'bet', 'ready', 'arena', 'result'] as const;
 export type ScreenId = (typeof SCREEN_ORDER)[number];
 
 export interface ScreenInstance {

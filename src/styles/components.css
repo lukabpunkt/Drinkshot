@@ -1723,3 +1723,70 @@
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Start-Screen (Roadmap M5b)                                          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Der Moment, in dem das Handy aufhört zu wandern. Alles zentriert, ein einziges Ziel:
+ * der Start-Knopf. Bewusst ruhig — die Show danach ist laut genug.
+ */
+.screen--ready {
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.ready__headline {
+  margin: 0;
+  font-size: var(--fs-xl);
+  color: var(--c-paper);
+}
+
+.ready__roster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.ready__putDown {
+  margin: 0;
+  max-width: 18ch;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--ready-color);
+}
+
+.ready__chips {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.ready__modeHint {
+  margin: 0;
+  max-width: 26ch;
+  font-size: var(--fs-sm);
+  /* 62 % Papier auf Panel = 6.54:1, geprüft von check-contrast.mjs */
+  color: rgb(255 248 231 / 62%);
+}
+
+.ready__start {
+  width: min(100%, 320px);
+  margin-top: var(--space-3);
+}
+
+/* Während der Sperre sichtbar taub — sonst tippt man ins Leere und wundert sich. */
+.screen--ready.is-locked .ready__start {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen--ready.is-locked .ready__start {
+    transition: none;
+  }
+}

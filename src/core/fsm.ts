@@ -12,7 +12,7 @@ import { MAX_BET, MIN_BET, MIN_PLAYERS, type DurationPreset, type GameMode } fro
 import type { Bet, PlayerId } from './lottery';
 import { createRoundSetup, type RoundSetup } from './session';
 
-export const GAME_STATES = ['TITLE', 'LOBBY', 'PASS', 'BET', 'ARENA', 'RESULT'] as const;
+export const GAME_STATES = ['TITLE', 'LOBBY', 'PASS', 'BET', 'READY', 'ARENA', 'RESULT'] as const;
 export type GameState = (typeof GAME_STATES)[number];
 
 export type GameEvent =
@@ -22,15 +22,17 @@ export type GameEvent =
   | { type: 'begin' }
   /** PASS → BET */
   | { type: 'tap' }
-  /** BET → PASS(i+1) oder, beim letzten Spieler, BET → ARENA (mit Ziehung) */
+  /** BET → PASS(i+1) oder, beim letzten Spieler, BET → READY */
   | { type: 'confirm'; sips: number }
+  /** READY → ARENA (mit Ziehung) */
+  | { type: 'startShow' }
   /** ARENA → RESULT */
   | { type: 'showFinished' }
   /** RESULT → PASS(0) */
   | { type: 'nextRound' }
   /** RESULT → LOBBY */
   | { type: 'changePlayers' }
-  /** PASS/BET/ARENA → LOBBY (Back-Button / "Runde abbrechen?") */
+  /** PASS/BET/READY/ARENA → LOBBY (Back-Button / "Runde abbrechen?") */
   | { type: 'cancel' };
 
 export type GameEventType = GameEvent['type'];
@@ -42,7 +44,7 @@ export interface FsmContext {
   playerIndex: number;
   /** Bisher abgegebene Einsaetze der laufenden Runde. */
   bets: Bet[];
-  /** Erst ab ARENA gesetzt. */
+  /** Erst ab ARENA gesetzt — die Ziehung passiert beim Verlassen von READY. */
   round: RoundSetup | null;
   mode: GameMode;
   durationPreset: DurationPreset;
@@ -93,6 +95,7 @@ const ALLOWED: Record<GameState, readonly GameEventType[]> = {
   LOBBY: ['begin'],
   PASS: ['tap', 'cancel'],
   BET: ['confirm', 'cancel'],
+  READY: ['startShow', 'cancel'],
   ARENA: ['showFinished', 'cancel'],
   RESULT: ['nextRound', 'changePlayers'],
 };
@@ -153,7 +156,10 @@ export function createFsm(options: FsmOptions = {}): Fsm {
         return 'BET';
 
       case 'confirm':
-        return context.playerIndex < context.players.length - 1 ? 'PASS' : 'ARENA';
+        return context.playerIndex < context.players.length - 1 ? 'PASS' : 'READY';
+
+      case 'startShow':
+        return 'ARENA';
 
       case 'showFinished':
         return 'RESULT';
@@ -180,15 +186,21 @@ export function createFsm(options: FsmOptions = {}): Fsm {
       case 'confirm': {
         const playerId = context.players[context.playerIndex]!;
         context.bets.push({ playerId, sips: event.sips });
-        if (target === 'PASS') {
-          context.playerIndex += 1;
-          return;
-        }
-        // Letzter Spieler: genau hier faellt die Entscheidung (ADR-2).
+        if (target === 'PASS') context.playerIndex += 1;
+        return;
+      }
+
+      /*
+       * Hier faellt die Entscheidung — genau einmal, ausschliesslich in der FSM (ADR-2).
+       *
+       * Bis M5 hing die Ziehung am `confirm` des letzten Spielers. Seit der Start-Screen
+       * dazwischensteht, haengt sie an dem Uebergang, der die Show wirklich startet: Wer
+       * aus READY abbricht, hat nie gezogen (ADR-42).
+       */
+      case 'startShow':
         context.round = drawRound(context.bets, context.mode, context.durationPreset);
         drawCount += 1;
         return;
-      }
 
       case 'showFinished':
         context.roundNumber += 1;

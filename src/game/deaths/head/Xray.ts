@@ -11,16 +11,14 @@ import { UI_COLORS } from '@/config/theme';
 import { impactStars } from '../../fx/MuzzleFlash';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 /** Vier Frames bei 60 Hz — genau so kurz, dass man es sieht, ohne es zu begreifen. */
 const FLICKER_FRAMES = 4;
 const FRAME_MS = 1000 / 60;
 
 export const headXray: DeathSequence = {
-  id: 'head_xray',
-  zone: 'head',
-  weight: 9,
-  needsSecondShot: false,
+  ...deathMeta('head_xray'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

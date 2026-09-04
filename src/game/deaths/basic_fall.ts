@@ -10,12 +10,10 @@ import gsap from 'gsap';
 import { impactStars } from '../fx/MuzzleFlash';
 import { finishDeath, impactBeat } from '../fx/deathFinish';
 import type { DeathContext, DeathSequence } from './DeathSequence';
+import { deathMeta } from './catalog';
 
 export const basicFall: DeathSequence = {
-  id: 'basic_fall',
-  zone: 'body',
-  weight: 3,
-  needsSecondShot: false,
+  ...deathMeta('basic_fall'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

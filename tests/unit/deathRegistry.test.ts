@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW, MIRACLE_CHANCE } from '@/config/rules';
 import { createSeededRng } from '@/core/rng';
 import { t } from '@/core/i18n';
+import { DEATH_CATALOG } from '@/game/deaths/catalog';
 import { DEATH_ZONES } from '@/core/session';
 import {
   allDeaths,
@@ -78,8 +79,18 @@ describe('Registry', () => {
 });
 
 describe('Auswahl', () => {
-  it('wirft ohne registrierte Sequenz', () => {
-    expect(() => pickDeath({ rng: createSeededRng(1) })).toThrow(/Keine DeathSequence/);
+  it('wirft bei leerem Pool', () => {
+    expect(() => pickDeath({ rng: createSeededRng(1), pool: [] })).toThrow(/Katalog/);
+  });
+
+  /*
+   * Die Ziehung läuft über den **Katalog**, nicht über die Registry — sonst müsste der
+   * gesamte Rendering-Code geladen sein, bevor überhaupt gewürfelt werden kann (ADR-35).
+   */
+  it('zieht auch ohne geladene Implementierungen', () => {
+    clearDeathRegistry();
+    const meta = pickDeath({ rng: createSeededRng(3) });
+    expect(DEATH_CATALOG.map((entry) => entry.id)).toContain(meta.id);
   });
 
   it('respektiert die Gewichte', () => {

@@ -15,6 +15,7 @@ import { popSpeechBubble } from '../../fx/SpeechBubble';
 import { finishDeath } from '../../fx/deathFinish';
 import { spawnGroundProp } from '../../fx/GroundProp';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 /** Der Leuchtspur-Streifen der vorbeifliegenden Kugel. */
 let tracerTexture: ReturnType<typeof createCanvasTexture> | undefined;
@@ -36,14 +37,7 @@ function getTracerTexture(): ReturnType<typeof createCanvasTexture> {
 }
 
 export const miracleDodge: DeathSequence = {
-  id: 'miracle_dodge',
-  zone: 'miracle',
-  /*
-   * Das Gewicht spielt hier keine Rolle: Die Seltenheit steuert `MIRACLE_CHANCE`
-   * (1 von 40 Runden, GDD §4.1) direkt in `pickDeath`, nicht die gewichtete Auswahl.
-   */
-  weight: 1,
-  needsSecondShot: false,
+  ...deathMeta('miracle_dodge'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio, others } = ctx;

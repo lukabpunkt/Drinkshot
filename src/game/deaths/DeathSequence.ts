@@ -12,6 +12,7 @@
 import { DEATH_NO_REPEAT_MIN_POOL, DEATH_NO_REPEAT_WINDOW, MIRACLE_CHANCE } from '@/config/rules';
 import type { SeededRng } from '@/core/rng';
 import type { DeathId, DeathZone } from '@/core/session';
+import { DEATH_CATALOG, type DeathMeta } from './catalog';
 import type { Arena } from '../Arena';
 import type { Camera } from '../Camera';
 import type { Scope } from '../Scope';
@@ -46,18 +47,8 @@ export interface DeathContext {
   arena: Arena;
 }
 
-export interface DeathSequence {
-  id: DeathId;
-  zone: DeathZone;
-  /** Auswahl-Gewicht; `miracle` ist bewusst sehr klein. */
-  weight: number;
-  /** Braucht die Sequenz einen zweiten Schuss (Bein, Miss)? */
-  needsSecondShot: boolean;
-  /**
-   * Optionaler Riegel: Manche Sequenzen brauchen eine Voraussetzung — `head_hat_launch`
-   * etwa einen Hut, den rund 40 % der Männchen nicht tragen. Die Auswahl fragt vorher.
-   */
-  isEligible?(ctx: DeathContext): boolean;
+/** Eine Sequenz ist ihre Katalog-Beschreibung plus die Animation dazu. */
+export interface DeathSequence extends DeathMeta {
   build(ctx: DeathContext): gsap.core.Timeline;
 }
 
@@ -101,14 +92,8 @@ export interface PickDeathOptions {
   recent?: readonly DeathId[];
   /** Sind Wunder erlaubt (Settings)? */
   miracles?: boolean;
-  /**
-   * Kontext für `isEligible`. Fehlt er (etwa bei der Ziehung, wo es noch keine Shotlings
-   * gibt), werden Sequenzen mit Voraussetzung übersprungen — lieber eine Sequenz weniger
-   * als eine, die nicht spielbar ist.
-   */
-  context?: DeathContext;
-  /** Nur für Tests: statt der globalen Registry diese Liste verwenden. */
-  pool?: readonly DeathSequence[];
+  /** Ohne Angabe der ganze Katalog; Tests reichen eigene Listen herein. */
+  pool?: readonly DeathMeta[];
 }
 
 /**
@@ -122,37 +107,27 @@ export interface PickDeathOptions {
  * Das No-Repeat-Fenster greift nur, solange genug Sequenzen registriert sind — sonst hätte
  * man mit wenigen Animationen gar keine Auswahl mehr.
  */
-export function pickDeath(options: PickDeathOptions): DeathSequence {
-  const all = options.pool ?? allDeaths();
-  if (all.length === 0) throw new Error('Keine DeathSequence registriert.');
+export function pickDeath(options: PickDeathOptions): DeathMeta {
+  const all = options.pool ?? DEATH_CATALOG;
+  if (all.length === 0) throw new Error('Der Death-Katalog ist leer.');
 
   const allowMiracles = options.miracles ?? true;
-  const miracles = all.filter((sequence) => sequence.zone === 'miracle');
+  const miracles = all.filter((meta) => meta.zone === 'miracle');
 
   if (allowMiracles && miracles.length > 0 && options.rng.chance(MIRACLE_CHANCE)) {
-    const eligibleMiracles = miracles.filter(
-      (sequence) => !sequence.isEligible || (options.context && sequence.isEligible(options.context))
-    );
-    const pool = eligibleMiracles.length > 0 ? eligibleMiracles : miracles;
-    return options.rng.weighted(pool, (sequence) => sequence.weight);
+    return options.rng.weighted(miracles, (meta) => meta.weight);
   }
 
-  let candidates: DeathSequence[] = all.filter((sequence) => sequence.zone !== 'miracle');
+  let candidates: DeathMeta[] = all.filter((meta) => meta.zone !== 'miracle');
   if (candidates.length === 0) candidates = [...all];
-
-  // Voraussetzungen prüfen (z. B. „trägt einen Hut").
-  const eligible = candidates.filter(
-    (sequence) => !sequence.isEligible || (options.context && sequence.isEligible(options.context))
-  );
-  if (eligible.length > 0) candidates = eligible;
 
   if (candidates.length >= DEATH_NO_REPEAT_MIN_POOL) {
     const blocked = new Set((options.recent ?? []).slice(-DEATH_NO_REPEAT_WINDOW));
-    const fresh = candidates.filter((sequence) => !blocked.has(sequence.id));
+    const fresh = candidates.filter((meta) => !blocked.has(meta.id));
     if (fresh.length > 0) candidates = fresh;
   }
 
-  return options.rng.weighted(candidates, (sequence) => sequence.weight);
+  return options.rng.weighted(candidates, (meta) => meta.weight);
 }
 
 /** Hält die zuletzt gespielten IDs für das No-Repeat-Fenster. */

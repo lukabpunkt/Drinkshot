@@ -5,6 +5,9 @@
  *
  * Die späte Landung ist der eigentliche Gag: Der Zuschauer hat den Hut schon vergessen.
  * Deshalb ist die Sequenz auch länger als die anderen — sie braucht die Leere dazwischen.
+ *
+ * Voraussetzung ist ein Hut (`requiresHat` im Katalog). Rund 40 % der Männchen tragen
+ * keinen; die Arena setzt dem Opfer dann einen auf, statt die Sequenz auszuschliessen.
  */
 
 import gsap from 'gsap';
@@ -12,17 +15,10 @@ import { MOTION } from '@/config/theme';
 import { impactStars } from '../../fx/MuzzleFlash';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const headHatLaunch: DeathSequence = {
-  id: 'head_hat_launch',
-  zone: 'head',
-  weight: 10,
-  needsSecondShot: false,
-
-  /** Ohne Hut kein Hut-Abschuss — rund 40 % tragen keinen (Art Direction §5.1). */
-  isEligible(ctx: DeathContext): boolean {
-    return ctx.victim.getHat() !== 'none';
-  },
+  ...deathMeta('head_hat_launch'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio, arena } = ctx;

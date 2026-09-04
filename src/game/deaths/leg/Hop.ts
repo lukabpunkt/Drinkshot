@@ -13,16 +13,14 @@ import { t } from '@/core/i18n';
 import { popSpeechBubble } from '../../fx/SpeechBubble';
 import { finishDeath, impactBeat, secondShot } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 /** Wie viele Hüpfer, bevor der Scharfschütze die Geduld verliert. */
 const HOPS = 5;
 const HOP_MS = 220;
 
 export const legHop: DeathSequence = {
-  id: 'leg_hop',
-  zone: 'leg',
-  weight: 10,
-  needsSecondShot: true,
+  ...deathMeta('leg_hop'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio, arena } = ctx;

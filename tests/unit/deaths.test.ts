@@ -26,6 +26,7 @@ import {
   type DeathSequence,
 } from '@/game/deaths/DeathSequence';
 import { registerAllDeaths, resetDeathRegistration } from '@/game/deaths';
+import { DEATH_CATALOG } from '@/game/deaths/catalog';
 
 /** Atlas-Attrappe: liefert für jeden Frame-Namen eine leere Textur. */
 const fakeSheet = {
@@ -136,13 +137,24 @@ describe('Registry', () => {
     expect(twoShots).toEqual(['leg_hop', 'leg_spin', 'miss_then_hit']);
   });
 
-  it('head_hat_launch wählt sich ohne Hut ab', () => {
-    const withHat = makeHarness('cap');
-    const withoutHat = makeHarness('none');
-    const sequence = allDeaths().find((s) => s.id === 'head_hat_launch')!;
+  /*
+   * `head_hat_launch` braucht einen Hut. Statt die Sequenz auszuschliessen, bekommt das
+   * Opfer in dieser Runde einen (ADR-34) — Hüte sind Zierde und werden pro Runde neu
+   * gewürfelt. Der Katalog sagt der Arena, wann sie nachhelfen muss.
+   */
+  it('markiert die Sequenz, die einen Hut voraussetzt', () => {
+    const needsHat = DEATH_CATALOG.filter((meta) => meta.requiresHat).map((meta) => meta.id);
+    expect(needsHat).toEqual(['head_hat_launch']);
+  });
 
-    expect(sequence.isEligible?.(withHat.ctx)).toBe(true);
-    expect(sequence.isEligible?.(withoutHat.ctx)).toBe(false);
+  it('Katalog und Registry sind deckungsgleich', () => {
+    const registered = allDeaths()
+      .map((sequence) => `${sequence.id}:${sequence.zone}:${sequence.weight}`)
+      .sort();
+    const catalog = DEATH_CATALOG.map(
+      (meta) => `${meta.id}:${meta.zone}:${meta.weight}`
+    ).sort();
+    expect(registered).toEqual(catalog);
   });
 });
 

@@ -12,12 +12,10 @@ import { ANIM, MOTION } from '@/config/theme';
 import { impactStars } from '../../fx/MuzzleFlash';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const headHelmetSpin: DeathSequence = {
-  id: 'head_helmet_spin',
-  zone: 'head',
-  weight: 10,
-  needsSecondShot: false,
+  ...deathMeta('head_helmet_spin'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

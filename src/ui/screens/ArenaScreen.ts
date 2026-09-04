@@ -18,10 +18,13 @@ import type { ScreenContext, ScreenInstance } from '@/ui/router';
 import { Arena } from '@/game/Arena';
 import {
   areArenaAssetsReady,
+  arenaLayout,
+  arenaUpdateTimes,
   detectLowEffects,
   getArenaApp,
   loadArenaAssets,
   measureLowEffects,
+  preloadArenaAssets,
   type ArenaAppHandle,
 } from '@/game/ArenaApp';
 import { Camera } from '@/game/Camera';
@@ -33,7 +36,11 @@ import { ParticlePool } from '@/game/fx/ParticlePool';
 import { clearDeathProps } from '@/game/fx/deathFinish';
 import { registerAllDeaths } from '@/game/deaths';
 import { allDeaths, getDeath } from '@/game/deaths/DeathSequence';
+import { deathMeta } from '@/game/deaths/catalog';
 import { createDevPanel, type DevPanel } from '@/ui/components/devPanel';
+
+/** Hüte, die sich zum Wegschiessen eignen. */
+const HATS_WITH_BRIM = ['cap', 'party', 'tophat', 'helmet', 'crown', 'beanie'] as const;
 
 /** `?dev=1&hold=1` hält die Arena offen, damit `perf.spec.ts` messen kann. */
 function isHoldMode(dev: boolean): boolean {
@@ -82,6 +89,21 @@ function requestWakeLock(): () => void {
     void sentinel?.release().catch(() => undefined);
   };
 }
+
+/**
+ * Lädt die Atlanten im Voraus. Wird aus `main.ts` beim Betreten von PASS gerufen — dann
+ * ist der Arena-Chunk bereits da und kann die Assets anstossen.
+ */
+export function preloadArena(): void {
+  registerAllDeaths();
+  preloadArenaAssets();
+}
+
+/** Dev-Zugriff auf Messwerte und Geometrie, ohne dass `main.ts` PIXI importieren muss. */
+export const arenaDevHandle = {
+  updateTimes: (): readonly number[] => arenaUpdateTimes(),
+  layout: (): ReturnType<typeof arenaLayout> => arenaLayout(),
+};
 
 export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
   const round = ctx.fsm.context.round;
@@ -204,6 +226,17 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
     });
     resolveOverlaps(brains);
 
+    /*
+     * Braucht die gewürfelte Sequenz einen Hut (`head_hat_launch` schiesst ihn weg), setzt
+     * die Arena dem Opfer einen auf. Hüte sind reine Zierde und werden pro Runde neu
+     * gewürfelt — so bleibt die Sequenz im Pool, statt sich bei 40 % der Opfer selbst
+     * auszuschliessen (ADR-34).
+     */
+    if (round && deathMeta(round.deathId).requiresHat) {
+      const victim = shotlings.get(round.victimId);
+      if (victim && victim.getHat() === 'none') victim.setHat(rng.pick(HATS_WITH_BRIM));
+    }
+
     /* --- Scope und Kamera --- */
     scope = new Scope({
       worldToScreen: (x, y, out) => handle!.worldToScreen(x, y, out),
@@ -230,6 +263,17 @@ export function createArenaScreen(ctx: ScreenContext): ScreenInstance {
       const dt = ticker.deltaMS * (camera?.timeScale ?? 1);
       for (let i = 0; i < brains.length; i++) brains[i]!.update(dt, brains);
       resolveOverlaps(brains);
+
+    /*
+     * Braucht die gewürfelte Sequenz einen Hut (`head_hat_launch` schiesst ihn weg), setzt
+     * die Arena dem Opfer einen auf. Hüte sind reine Zierde und werden pro Runde neu
+     * gewürfelt — so bleibt die Sequenz im Pool, statt sich bei 40 % der Opfer selbst
+     * auszuschliessen (ADR-34).
+     */
+    if (round && deathMeta(round.deathId).requiresHat) {
+      const victim = shotlings.get(round.victimId);
+      if (victim && victim.getHat() === 'none') victim.setHat(rng.pick(HATS_WITH_BRIM));
+    }
       for (const shotling of shotlings.values()) shotling.update(dt);
       particles?.update(dt);
       scope?.update(ticker.deltaMS);

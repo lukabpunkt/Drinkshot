@@ -15,12 +15,10 @@ import { dirtFountain } from '../../fx/MuzzleFlash';
 import { popSpeechBubble } from '../../fx/SpeechBubble';
 import { finishDeath, secondShot } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const missThenHit: DeathSequence = {
-  id: 'miss_then_hit',
-  zone: 'miss',
-  weight: 8,
-  needsSecondShot: true,
+  ...deathMeta('miss_then_hit'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

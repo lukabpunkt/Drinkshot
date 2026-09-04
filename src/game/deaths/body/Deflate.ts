@@ -11,16 +11,14 @@ import gsap from 'gsap';
 import { MOTION } from '@/config/theme';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 /** Wieviele Schleifen der Ballon fliegt, bevor die Luft raus ist. */
 const LOOPS = 2.6;
 const FLIGHT_MS = 1500;
 
 export const bodyDeflate: DeathSequence = {
-  id: 'body_deflate',
-  zone: 'body',
-  weight: 9,
-  needsSecondShot: false,
+  ...deathMeta('body_deflate'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio, arena, rng } = ctx;

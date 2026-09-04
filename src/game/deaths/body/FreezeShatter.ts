@@ -11,15 +11,13 @@ import gsap from 'gsap';
 import { MOTION } from '@/config/theme';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 /** GDD nennt 6–8 Scherben. */
 const SHARD_COUNT = 8;
 
 export const bodyFreezeShatter: DeathSequence = {
-  id: 'body_freeze_shatter',
-  zone: 'body',
-  weight: 9,
-  needsSecondShot: false,
+  ...deathMeta('body_freeze_shatter'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

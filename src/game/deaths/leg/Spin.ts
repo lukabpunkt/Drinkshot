@@ -12,12 +12,10 @@ import { MOTION } from '@/config/theme';
 import { finishDeath, impactBeat, secondShot } from '../../fx/deathFinish';
 import { spawnGroundProp } from '../../fx/GroundProp';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const legSpin: DeathSequence = {
-  id: 'leg_spin',
-  zone: 'leg',
-  weight: 9,
-  needsSecondShot: true,
+  ...deathMeta('leg_spin'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

@@ -15,14 +15,14 @@ import { colorById, hex, UI_COLORS } from '@/config/theme';
 import { detectLocale, setLocale, t } from '@/core/i18n';
 import { createFsm, type GameState, type Transition } from '@/core/fsm';
 import { createRoundSetup, createSessionStore, resolveRound } from '@/core/session';
-import { getDeath, pickDeath } from '@/game/deaths/DeathSequence';
-import { registerAllDeaths } from '@/game/deaths';
-import { arenaLayout, arenaUpdateTimes, preloadArenaAssets } from '@/game/ArenaApp';
+import { DEATH_CATALOG, deathMeta, type DeathMeta } from '@/game/deaths/catalog';
+import { pickDeath } from '@/game/deaths/DeathSequence';
 import { confirmSheet } from '@/ui/components/sheet';
 import { showToast } from '@/ui/components/toast';
 import { setHapticsEnabled } from '@/ui/haptics';
-import { createRouter, type ScreenId } from '@/ui/router';
-import { createArenaScreen } from '@/ui/screens/ArenaScreen';
+import { createRouter, type ScreenContext, type ScreenId, type ScreenInstance } from '@/ui/router';
+// Nur als Typ — der Import wird beim Bauen entfernt, das Modul kommt zur Laufzeit.
+import type * as ArenaScreenModule from '@/ui/screens/ArenaScreen';
 import { createBetScreen } from '@/ui/screens/BetScreen';
 import { createLobbyScreen } from '@/ui/screens/LobbyScreen';
 import { createPassScreen } from '@/ui/screens/PassScreen';
@@ -48,12 +48,6 @@ setHapticsEnabled(settings.haptics);
 /* FSM                                                                 */
 /* ------------------------------------------------------------------ */
 
-/*
- * Die Registry muss stehen, bevor die erste Runde gezogen wird — sonst gäbe es beim
- * Übergang BET→ARENA nichts auszuwählen.
- */
-registerAllDeaths();
-
 const fsm = createFsm({
   players: session.activePlayers().map((player) => player.id),
   mode: settings.mode,
@@ -71,15 +65,20 @@ const fsm = createFsm({
        * Tests und für den Blick auf seltene Ausgänge: Auf das Wunder müsste man sonst
        * im Schnitt vierzig Runden warten.
        */
-      const forced = dev ? getDeath(params.get('death') ?? '') : undefined;
-      const sequence =
+      const forcedId = dev ? params.get('death') : null;
+      const forced: DeathMeta | undefined =
+        forcedId && DEATH_CATALOG.some((meta) => meta.id === forcedId)
+          ? deathMeta(forcedId)
+          : undefined;
+
+      const meta =
         forced ??
         pickDeath({
           rng,
           recent: session.state.rounds.slice(-4).map((round) => round.deathId),
           miracles: session.state.settings.miracles,
         });
-      return { deathId: sequence.id, zone: sequence.zone };
+      return { deathId: meta.id, zone: meta.zone };
     }),
   ...(dev
     ? {
@@ -116,8 +115,58 @@ router.register('title', createTitleScreen);
 router.register('lobby', createLobbyScreen);
 router.register('pass', createPassScreen);
 router.register('bet', createBetScreen);
-router.register('arena', createArenaScreen);
+/*
+ * Die Arena wird **nachgeladen**: PIXI, GSAP, die Filter und alle dreizehn
+ * Todesanimationen machen den grössten Teil des Codes aus, werden aber erst gebraucht,
+ * wenn die Runde läuft. Bis dahin lädt niemand mehr als die Menüs (Roadmap M5.10).
+ */
+router.register('arena', createLazyArenaScreen);
 router.register('result', createResultScreen);
+
+/**
+ * Platzhalter-Screen, der den echten Arena-Screen nachlädt.
+ *
+ * Der Router mountet synchron; der Arena-Code kommt asynchron. Der Platzhalter zeigt
+ * währenddessen den schwarzen Hintergrund, den die Arena ohnehin hat — man sieht keinen
+ * Übergang. In der Praxis ist das Modul längst da, weil es beim Betreten der Lobby
+ * vorgeladen wird.
+ */
+function createLazyArenaScreen(context: ScreenContext): ScreenInstance {
+  const el = document.createElement('section');
+  el.className = 'screen screen--arena is-loading';
+
+  let inner: ScreenInstance | undefined;
+  let disposed = false;
+
+  void loadArenaScreen()
+    .then(({ createArenaScreen }) => {
+      if (disposed) return;
+      inner = createArenaScreen(context);
+      el.replaceWith(inner.el);
+      inner.el.dataset.screen = 'arena';
+      inner.activate?.();
+    })
+    .catch((error) => {
+      console.error('[arena] Modul konnte nicht geladen werden', error);
+      showToast(t('error.generic'), { variant: 'danger' });
+      context.fsm.send({ type: 'showFinished' });
+    });
+
+  return {
+    el,
+    destroy() {
+      disposed = true;
+      inner?.destroy?.();
+    },
+  };
+}
+
+/** Ein Modul-Handle, damit Vite daraus einen eigenen Chunk schneidet. */
+type ArenaModule = typeof ArenaScreenModule;
+
+function loadArenaScreen(): Promise<ArenaModule> {
+  return import('@/ui/screens/ArenaScreen');
+}
 
 const SCREEN_FOR_STATE: Record<GameState, ScreenId> = {
   TITLE: 'title',
@@ -151,10 +200,26 @@ function wipeColor(state: GameState): string {
 const BACK_EVENTS = new Set(['cancel', 'changePlayers']);
 
 /**
- * Preload der Arena-Assets während der Betting-Phase (Architektur §7.12).
- * Die dauert ohnehin ≥ 10 s — beim Betreten der Arena darf nichts mehr nachladen.
+ * Vorladen in zwei Stufen (Architektur §7.12, Roadmap M5.10):
+ *
+ * - **Lobby**: der Arena-*Code*. Dort steht man mindestens ein paar Sekunden, und der
+ *   Chunk ist damit da, bevor die erste Runde beginnt.
+ * - **Pass**: die *Atlanten*. Die Betting-Phase dauert ohnehin ≥ 10 s — beim Betreten der
+ *   Arena darf nichts mehr nachgeladen werden.
  */
-fsm.on('PASS', { enter: () => preloadArenaAssets() });
+fsm.on('LOBBY', {
+  enter: () => {
+    void loadArenaScreen().catch(() => undefined);
+  },
+});
+
+fsm.on('PASS', {
+  enter: () => {
+    void loadArenaScreen()
+      .then((module) => module.preloadArena())
+      .catch(() => undefined);
+  },
+});
 
 fsm.subscribe(({ to, event }) => {
   void router.go(SCREEN_FOR_STATE[to], {
@@ -280,15 +345,24 @@ if (!startDeathPreview()) {
 void registerServiceWorker();
 
 if (dev) {
+  /*
+   * Der Dev-Zugriff hängt am nachgeladenen Arena-Modul, damit `main.ts` selbst kein PIXI
+   * importiert. Solange die Arena noch nicht geladen ist, gibt es eben nichts zu messen.
+   */
+  let arenaModule: ArenaModule | undefined;
+  void loadArenaScreen().then((module) => {
+    arenaModule = module;
+  });
+
   Object.assign(globalThis, {
     drinkshot: {
       fsm,
       session,
       router,
       /** Von `perf.spec.ts` gelesen: reine JS-Zeit pro Frame (Architektur §7.10). */
-      arenaUpdateTimes: () => arenaUpdateTimes(),
+      arenaUpdateTimes: () => arenaModule?.arenaDevHandle.updateTimes() ?? [],
       /** Aktuelle Arena-Geometrie — Werkzeuge schneiden Screenshots daraus zu. */
-      arenaLayout: () => arenaLayout(),
+      arenaLayout: () => arenaModule?.arenaDevHandle.layout(),
     },
   });
 }

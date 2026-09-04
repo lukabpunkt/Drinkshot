@@ -12,12 +12,10 @@ import { t } from '@/core/i18n';
 import { popSpeechBubble } from '../../fx/SpeechBubble';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const bodyDramatic: DeathSequence = {
-  id: 'body_dramatic',
-  zone: 'body',
-  weight: 10,
-  needsSecondShot: false,
+  ...deathMeta('body_dramatic'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

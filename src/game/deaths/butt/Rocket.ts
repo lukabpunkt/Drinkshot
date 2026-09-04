@@ -11,12 +11,10 @@ import { MOTION } from '@/config/theme';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import { spawnGroundProp } from '../../fx/GroundProp';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 export const buttRocket: DeathSequence = {
-  id: 'butt_rocket',
-  zone: 'butt',
-  weight: 10,
-  needsSecondShot: false,
+  ...deathMeta('butt_rocket'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio, arena } = ctx;

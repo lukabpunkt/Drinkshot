@@ -12,14 +12,12 @@ import { MOTION } from '@/config/theme';
 import { impactStars } from '../../fx/MuzzleFlash';
 import { finishDeath, impactBeat } from '../../fx/deathFinish';
 import type { DeathContext, DeathSequence } from '../DeathSequence';
+import { deathMeta } from '../catalog';
 
 const CIRCLE_MS = 1250;
 
 export const buttHotfoot: DeathSequence = {
-  id: 'butt_hotfoot',
-  zone: 'butt',
-  weight: 9,
-  needsSecondShot: false,
+  ...deathMeta('butt_hotfoot'),
 
   build(ctx: DeathContext): gsap.core.Timeline {
     const { victim, camera, fx, audio } = ctx;

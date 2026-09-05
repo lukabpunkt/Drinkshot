@@ -1108,3 +1108,42 @@ die Ausgeschiedenen im selben Moment wieder aktiv wurden.
       fehlt zwischendrin der Einsatz-Moment?
 - [ ] **Mit „Bewegung reduzieren"** im System: Schütze sichtbar, Schnitt statt Fahrt, kein
       Wackeln beim Warnschuss.
+
+---
+
+## Sudden Death: Einsätze bleiben geheim (2026-09-05)
+
+Zwei Nachbesserungen an dem Turnier von gestern.
+
+**Die Einsätze bleiben geheim, bis einer übrig ist.** Bisher deckte der Result-Screen nach
+jeder Runde alles auf — ab Runde 2 wusste damit jeder, was die Verbliebenen gesetzt hatten,
+und das Setzen war für den Rest des Turniers entwertet. Jetzt wird nur aufgedeckt, wen es
+getroffen hat.
+
+Zwei Dinge daran waren nicht offensichtlich:
+
+- **Die Chancen-Spalte musste mit weg** — auch bei den Aufgedeckten. Die Chance ist
+  `eigener Einsatz / Summe aller Einsätze`. Wer sie neben dem Einsatz sieht, rechnet die
+  Summe aus; bei zwei Verbliebenen ergibt „Einsatz 4 · Chance 40 %" exakt die 6 des
+  anderen. Ohne das wäre die Geheimhaltung eine Attrappe gewesen.
+- **Die Tabelle liest den ganzen Turnier-Block, nicht die laufende Runde.** `bets` schrumpft
+  mit dem Teilnehmerfeld — die in Runde 1 Gefallenen stehen ab Runde 2 gar nicht mehr drin
+  und wären aus der Tabelle verschwunden statt aufgedeckt zu bleiben.
+
+Die verdeckten Zeilen stehen unter den aufgedeckten und in Beitrittsreihenfolge, nie
+mitsortiert: Allein ihre Position in einer nach Einsatz sortierten Liste verriete sonst,
+wo ihr Einsatz ungefähr liegt.
+
+**Der Letzte verteilt nur seinen eigenen Einsatz.** Vorher die Summe aller — bei fünf
+Spielern schnell zwanzig Schlücke auf einmal. Damit entfällt `RoundSetup.potSips` samt
+seiner Verkabelung durch FSM und Ziehung wieder; das ist die Rücknahme des Topf-Teils von
+ADR-56, festgehalten in ADR-60.
+
+Der Reveal-Moment aus GDD §3.7 ist damit nicht verloren, sondern aufgespart: Mit der
+Entscheidung des Turniers liegt alles offen.
+
+| | |
+|---|---|
+| Unit-Tests | 456 (vorher 451) — fünf neue für `stakeReveal` |
+| Neue ADRs | 60 · nimmt den Topf-Teil von ADR-56 zurück |
+| Entfallen | `RoundSetup.potSips` und `FsmContext.potSips` |

@@ -193,7 +193,6 @@ interface RoundSetup {
   deathId: DeathId; // gewählte Todesanimation
   mode: GameMode;
   durationPreset: 'short' | 'normal' | 'long';
-  potSips: number; // Topf des Turniers; ausserhalb = Summe von `bets` (ADR-56)
 }
 
 interface RoundResult extends RoundSetup {

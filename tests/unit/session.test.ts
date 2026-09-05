@@ -12,12 +12,14 @@ import {
   createRoundSetup,
   createSessionStore,
   eliminatedPlayerIds,
+  stakeReveal,
   loadSession,
   resolveRound,
   roundOdds,
   saveSession,
   scoreboard,
   type RoundResult,
+  type Session,
   type RoundSetup,
 } from '@/core/session';
 
@@ -39,7 +41,6 @@ function setup(overrides: Partial<RoundSetup> = {}): RoundSetup {
     zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
-    potSips: BETS.reduce((sum, bet) => sum + bet.sips, 0),
     ...overrides,
   };
 }
@@ -137,7 +138,8 @@ describe('resolveRound — Modus "Sudden Death"', () => {
     );
     expect(result.eliminatedIds).toEqual(['b']);
     expect(result.winnerId).toBe('a');
-    expect(result.sipsToDistribute).toBe(10);
+    // Sein eigener Einsatz, nicht die Summe beider (ADR-60).
+    expect(result.sipsToDistribute).toBe(4);
   });
 });
 
@@ -349,11 +351,11 @@ describe('SessionStore', () => {
 
     store.recordRound(resolveRound(setup({ mode: 'suddenDeath', bets: all, victimId: c.id })));
     const finale = resolveRound(
-      setup({ mode: 'suddenDeath', bets: all.slice(0, 2), victimId: b.id, potSips: 6 })
+      setup({ mode: 'suddenDeath', bets: all.slice(0, 2), victimId: b.id })
     );
     expect(finale.winnerId).toBe(a.id);
-    // Der Letzte verteilt den Topf des Turniers, nicht nur den der Schlussrunde (ADR-56).
-    expect(finale.sipsToDistribute).toBe(6);
+    // Der Letzte verteilt seinen **eigenen** Einsatz, nicht den Topf (ADR-60).
+    expect(finale.sipsToDistribute).toBe(1);
 
     store.recordRound(finale);
     expect(store.activePlayers()).toHaveLength(3);
@@ -391,7 +393,6 @@ describe('SessionStore', () => {
     // Nur die Runde mit bekanntem Modus ueberlebt — und sie hat wieder alle Felder.
     expect(session.rounds).toHaveLength(1);
     expect(session.rounds[0]!.eliminatedIds).toEqual([]);
-    expect(session.rounds[0]!.potSips).toBe(2);
     expect(() => eliminatedPlayerIds(session)).not.toThrow();
   });
 
@@ -561,5 +562,112 @@ describe('createRoundSetup — Showdown zieht bis auf einen', () => {
     // Die zweite Ziehung kennt die erste — sonst gäbe es Dubletten in einer Runde.
     expect(seen[0]!.drawn).toEqual([]);
     expect(seen[1]!.drawn).toEqual(['death_0']);
+  });
+});
+
+describe('stakeReveal — im Turnier bleiben die Einsaetze geheim (ADR-60)', () => {
+  const P = ['a', 'b', 'c', 'd'];
+  const BETS_ALL = P.map((id, i) => ({ playerId: id, sips: i + 1 }));
+
+  /** Baut eine Sudden-Death-Runde mit vorgegebenem Opfer und Teilnehmerfeld. */
+  function round(bets: typeof BETS_ALL, victimId: string, at: number): RoundResult {
+    return resolveRound(setup({ mode: 'suddenDeath', bets, victimId }), at);
+  }
+
+  function sessionWith(rounds: RoundResult[]): Session {
+    return { ...createEmptySession(), rounds };
+  }
+
+  it('deckt in Runde 1 nur den Getroffenen auf', () => {
+    const r1 = round(BETS_ALL, 'd', 1000);
+    const rows = stakeReveal(sessionWith([r1]), r1);
+
+    const open = rows.filter((row) => row.sips !== null);
+    expect(open).toEqual([{ playerId: 'd', sips: 4, chance: null }]);
+    // Alle anderen stehen noch — Einsatz **und** Chance verdeckt.
+    expect(rows.filter((row) => row.sips === null).map((row) => row.playerId)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+    expect(rows.every((row) => row.chance === null)).toBe(true);
+  });
+
+  it('haelt die Chance auch beim Aufgedeckten zurueck — sie verriete die Summe', () => {
+    /*
+     * Zwei Verbliebene: Aus "Einsatz 2 · Chance 40 %" liesse sich die Summe 5 und damit
+     * der Einsatz des anderen exakt ausrechnen.
+     */
+    const finalists = [
+      { playerId: 'a', sips: 3 },
+      { playerId: 'b', sips: 2 },
+    ];
+    const r = resolveRound(
+      setup({ mode: 'suddenDeath', bets: finalists, victimId: 'b' }),
+      1000
+    );
+    // Ohne `winnerId` laeuft das Turnier weiter — genau der Fall, um den es geht.
+    const running: RoundResult = { ...r };
+    delete running.winnerId;
+    delete running.sipsToDistribute;
+
+    const rows = stakeReveal(sessionWith([running]), running);
+    const shot = rows.find((row) => row.playerId === 'b');
+    expect(shot?.sips).toBe(2);
+    expect(shot?.chance).toBeNull();
+  });
+
+  it('deckt alles auf, sobald das Turnier entschieden ist', () => {
+    const r1 = round(BETS_ALL, 'd', 1000);
+    const r2 = round(BETS_ALL.slice(0, 3), 'c', 2000);
+    const r3 = round(BETS_ALL.slice(0, 2), 'b', 3000);
+    expect(r3.winnerId).toBe('a');
+
+    const rows = stakeReveal(sessionWith([r1, r2, r3]), r3);
+    expect(rows).toHaveLength(4);
+    expect(rows.every((row) => row.sips !== null && row.chance !== null)).toBe(true);
+    // Jeder mit seinem urspruenglichen Einsatz, auch die frueh Gefallenen.
+    expect(new Map(rows.map((row) => [row.playerId, row.sips]))).toEqual(
+      new Map([
+        ['d', 4],
+        ['c', 3],
+        ['b', 2],
+        ['a', 1],
+      ])
+    );
+  });
+
+  it('fuehrt frueher Gefallene weiter, obwohl sie in `bets` fehlen', () => {
+    const r1 = round(BETS_ALL, 'd', 1000);
+    const r2 = round(BETS_ALL.slice(0, 3), 'c', 2000);
+    expect(r2.bets.map((bet) => bet.playerId)).not.toContain('d');
+
+    const rows = stakeReveal(sessionWith([r1, r2]), r2);
+    const open = rows.filter((row) => row.sips !== null).map((row) => row.playerId);
+    expect(open).toEqual(['d', 'c']);
+  });
+
+  it('deckt ausserhalb eines Turniers weiterhin alle auf', () => {
+    const classic = resolveRound(setup({ mode: 'classic' }), 1000);
+    const rows = stakeReveal(sessionWith([classic]), classic);
+    expect(rows.every((row) => row.sips !== null && row.chance !== null)).toBe(true);
+    expect(rows).toHaveLength(3);
+  });
+
+  it('sortiert die Aufgedeckten absteigend nach Einsatz', () => {
+    /*
+     * Die Mutigen stehen oben — das erzeugt das Gespraech (GDD §3.7). Die Sortierung stand
+     * frueher im Tabellen-Code und ging beim Verschieben der Logik nach `core/` einmal
+     * verloren; der E2E-Flow-Test fiel darueber.
+     */
+    const classic = resolveRound(setup({ mode: 'classic' }), 1000);
+    expect(stakeReveal(sessionWith([classic]), classic).map((row) => row.sips)).toEqual([
+      5, 3, 2,
+    ]);
+
+    const r1 = round(BETS_ALL, 'a', 1000);
+    const r2 = round(BETS_ALL.slice(1), 'd', 2000);
+    const open = stakeReveal(sessionWith([r1, r2]), r2).filter((row) => row.sips !== null);
+    expect(open.map((row) => row.sips)).toEqual([4, 1]);
   });
 });

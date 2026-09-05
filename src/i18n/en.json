@@ -108,7 +108,10 @@
       "miss": "Missed. Then didn't.",
       "miracle": "Lucky one!"
     },
-    "continue": "Continue"
+    "continue": "Continue",
+    "revealedBets": "Revealed bets",
+    "stakeSecret": "?",
+    "stakesSecret": "While the tournament runs, only those who were hit are revealed. Chances stay hidden as well — they would give away the others’ bets."
   },
   "settings": {
     "headline": "Settings",

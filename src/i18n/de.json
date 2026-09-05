@@ -108,7 +108,10 @@
       "miss": "Erst daneben. Dann doch nicht.",
       "miracle": "Glück gehabt!"
     },
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "revealedBets": "Aufgedeckte Einsätze",
+    "stakeSecret": "?",
+    "stakesSecret": "Solange das Turnier läuft, wird nur aufgedeckt, wen es getroffen hat. Die Chancen bleiben ebenfalls verdeckt — sie würden die Einsätze der anderen verraten."
   },
   "settings": {
     "headline": "Einstellungen",

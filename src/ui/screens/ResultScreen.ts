@@ -10,7 +10,7 @@ import { MIN_PLAYERS } from '@/config/rules';
 import { colorById, hex, MOTION, UI_COLORS } from '@/config/theme';
 import { plural, t } from '@/core/i18n';
 import * as audio from '@/audio/AudioManager';
-import { eliminatedPlayerIds, type RoundResult } from '@/core/session';
+import { eliminatedPlayerIds, stakeReveal, type RoundResult, type StakeRow } from '@/core/session';
 import { countUp, growBar, prefersReducedMotion } from '@/ui/animate';
 import { createPlayerBadge } from '@/ui/components/badge';
 import { createButton } from '@/ui/components/button';
@@ -163,10 +163,20 @@ export function createResultScreen(ctx: ScreenContext): ScreenInstance {
   details.className = 'result__details';
   details.open = true;
 
+  const rows = stakeReveal(ctx.session.state, round);
+  const anySecret = rows.some((row) => row.sips === null || row.chance === null);
+
   const summary = document.createElement('summary');
   summary.className = 'result__summary';
-  summary.textContent = t('result.allBets');
-  details.append(summary, createBetsTable(round, ctx, cancels));
+  summary.textContent = anySecret ? t('result.revealedBets') : t('result.allBets');
+  details.append(summary, createBetsTable(round, rows, ctx, cancels));
+
+  if (anySecret) {
+    const note = document.createElement('p');
+    note.className = 'result__secretNote';
+    note.textContent = t('result.stakesSecret');
+    details.append(note);
+  }
 
   /* --- Scoreboard --- */
   const scoreboard = createScoreboard(ctx, cancels);
@@ -329,6 +339,7 @@ function subText(round: RoundResult, ctx: ScreenContext): string {
 
 function createBetsTable(
   round: RoundResult,
+  rows: readonly StakeRow[],
   ctx: ScreenContext,
   cancels: (() => void)[]
 ): HTMLElement {
@@ -346,20 +357,18 @@ function createBetsTable(
   head.append(headRow);
 
   const body = document.createElement('tbody');
-  // Absteigend nach Einsatz — die Mutigen stehen oben, das erzeugt das Gespraech.
-  const sorted = [...round.bets].sort((a, b) => b.sips - a.sips);
 
-  for (const bet of sorted) {
-    const player = ctx.session.playerById(bet.playerId);
-    const row = document.createElement('tr');
+  for (const row of rows) {
+    const player = ctx.session.playerById(row.playerId);
+    const tr = document.createElement('tr');
     /*
-     * Normalerweise hebt die Tabelle das Opfer hervor. Im Showdown sind fast alle Opfer —
-     * hervorgehoben wird deshalb der Überlebende.
+     * Normalerweise hebt die Tabelle das Opfer hervor. Ist die Runde entschieden, sind
+     * fast alle Opfer — hervorgehoben wird dann der Überlebende.
      */
-    if (round.mode === 'showdown') {
-      if (bet.playerId === round.winnerId) row.classList.add('is-winner');
-    } else if (bet.playerId === round.victimId) {
-      row.classList.add('is-victim');
+    if (round.winnerId !== undefined) {
+      if (row.playerId === round.winnerId) tr.classList.add('is-winner');
+    } else if (row.playerId === round.victimId) {
+      tr.classList.add('is-victim');
     }
 
     const nameCell = document.createElement('td');
@@ -373,20 +382,29 @@ function createBetsTable(
 
     const betCell = document.createElement('td');
     betCell.className = 'bets__num';
-    const delay = body.childElementCount * MOTION.staggerMs;
-    cancels.push(countUp(betCell, bet.sips, { delayMs: delay }));
 
     const chanceCell = document.createElement('td');
     chanceCell.className = 'bets__num';
-    cancels.push(
-      countUp(chanceCell, Math.round((round.odds[bet.playerId] ?? 0) * 100), {
-        delayMs: delay,
-        format: (n) => `${n} %`,
-      })
-    );
 
-    row.append(nameCell, betCell, chanceCell);
-    body.append(row);
+    const delay = body.childElementCount * MOTION.staggerMs;
+    if (row.sips === null) {
+      betCell.textContent = t('result.stakeSecret');
+      betCell.classList.add('is-secret');
+    } else cancels.push(countUp(betCell, row.sips, { delayMs: delay }));
+
+    if (row.chance === null) {
+      chanceCell.textContent = t('result.stakeSecret');
+      chanceCell.classList.add('is-secret');
+    } else
+      cancels.push(
+        countUp(chanceCell, Math.round(row.chance * 100), {
+          delayMs: delay,
+          format: (n) => `${n} %`,
+        })
+      );
+
+    tr.append(nameCell, betCell, chanceCell);
+    body.append(tr);
   }
 
   table.append(head, body);

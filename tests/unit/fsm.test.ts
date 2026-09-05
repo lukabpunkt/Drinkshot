@@ -21,7 +21,6 @@ function fakeDraw(bets: readonly Bet[]): RoundSetup {
     zone: 'body',
     mode: 'classic',
     durationPreset: 'normal',
-    potSips: bets.reduce((sum, bet) => sum + bet.sips, 0),
   };
 }
 
@@ -303,8 +302,7 @@ describe('FSM — Setter', () => {
         { playerId: 'b', sips: 2 },
       ],
       'doubleTap',
-      'short',
-      3
+      'short'
     );
   });
 });
@@ -342,7 +340,7 @@ describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-56)', () =>
     ]);
   });
 
-  it('haelt den Topf des Turniers fest, waehrend die Einsaetze schrumpfen', () => {
+  it('zieht nur noch unter den Verbliebenen', () => {
     const draw = vi.fn(fakeDraw);
     const fsm = createFsm({ players: PLAYERS, mode: 'suddenDeath', drawRound: draw });
     fsm.send({ type: 'start' });
@@ -359,8 +357,7 @@ describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-56)', () =>
         { playerId: 'b', sips: 2 },
       ],
       'suddenDeath',
-      'normal',
-      6
+      'normal'
     );
   });
 
@@ -382,7 +379,6 @@ describe('Sudden Death — einmal setzen, dann Runde fuer Runde (ADR-56)', () =>
 
     expect(fresh.state).toBe('PASS');
     expect(fresh.context.bets).toEqual([]);
-    expect(fresh.context.potSips).toBe(0);
   });
 
   it('traegt die Einsaetze in Modi ohne Ausscheiden nicht weiter', () => {

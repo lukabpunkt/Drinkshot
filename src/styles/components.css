@@ -1889,3 +1889,16 @@
   font-size: var(--fs-md);
   letter-spacing: 0.04em;
 }
+
+/* Verdeckte Einsaetze und Chancen im laufenden Turnier (ADR-60). */
+.bets__num.is-secret {
+  color: rgb(255 248 231 / 45%);
+  font-family: var(--font-display);
+}
+
+.result__secretNote {
+  margin: var(--space-2) 0 0;
+  color: rgb(255 248 231 / 60%);
+  font-size: var(--fs-sm);
+  text-align: center;
+}

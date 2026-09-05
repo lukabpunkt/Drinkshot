@@ -59,47 +59,41 @@ const fsm = createFsm({
    * **Inszenierung** dazu: welche Todesanimation gespielt wird. Sie hängt am Seed der
    * Runde, nicht am sicheren Zufall — die Show soll reproduzierbar sein.
    */
-  drawRound: (bets, mode, duration, potSips) =>
-    createRoundSetup(
-      bets,
-      mode,
-      duration,
-      (rng, { drawn, index, total }) => {
-        /*
-         * `?dev=1&death=<id>` erzwingt eine bestimmte Sequenz. Gebraucht wird das für
-         * Tests und für den Blick auf seltene Ausgänge: Auf das Wunder müsste man sonst
-         * im Schnitt vierzig Runden warten.
-         */
-        const forcedId = dev ? params.get('death') : null;
-        const forced: DeathMeta | undefined =
-          forcedId && DEATH_CATALOG.some((meta) => meta.id === forcedId) ? deathMeta(forcedId) : undefined;
+  drawRound: (bets, mode, duration) =>
+    createRoundSetup(bets, mode, duration, (rng, { drawn, index, total }) => {
+      /*
+       * `?dev=1&death=<id>` erzwingt eine bestimmte Sequenz. Gebraucht wird das für
+       * Tests und für den Blick auf seltene Ausgänge: Auf das Wunder müsste man sonst
+       * im Schnitt vierzig Runden warten.
+       */
+      const forcedId = dev ? params.get('death') : null;
+      const forced: DeathMeta | undefined =
+        forcedId && DEATH_CATALOG.some((meta) => meta.id === forcedId) ? deathMeta(forcedId) : undefined;
 
-        /*
-         * Im Showdown fallen mehrere Schüsse in einer Runde. Zwei Sequenzen taugen dann
-         * nicht an jeder Stelle:
-         *
-         * - **Wunder** würden die Regel brechen, dass genau einer überlebt.
-         * - Sequenzen mit `needsSecondShot` (`leg_hop`, `leg_spin`, `miss_then_hit`) ziehen
-         *   das Fadenkreuz bis zu einer Sekunde nach dem Tod zurück auf die Leiche. Vor dem
-         *   letzten Schuss würde das mitten in die nächste Suche hineinreissen.
-         */
-        const isLastOfRound = index === total - 1;
-        const pool = DEATH_CATALOG.filter((meta) => isLastOfRound || !meta.needsSecondShot || total === 1);
+      /*
+       * Im Showdown fallen mehrere Schüsse in einer Runde. Zwei Sequenzen taugen dann
+       * nicht an jeder Stelle:
+       *
+       * - **Wunder** würden die Regel brechen, dass genau einer überlebt.
+       * - Sequenzen mit `needsSecondShot` (`leg_hop`, `leg_spin`, `miss_then_hit`) ziehen
+       *   das Fadenkreuz bis zu einer Sekunde nach dem Tod zurück auf die Leiche. Vor dem
+       *   letzten Schuss würde das mitten in die nächste Suche hineinreissen.
+       */
+      const isLastOfRound = index === total - 1;
+      const pool = DEATH_CATALOG.filter((meta) => isLastOfRound || !meta.needsSecondShot || total === 1);
 
-        const meta =
-          forced ??
-          pickDeath({
-            pool,
-            rng,
-            // Auch innerhalb der Runde nicht wiederholen: Bei sieben Toden hintereinander
-            // fiele eine doppelte Sequenz sofort auf.
-            recent: [...session.state.rounds.slice(-4).map((round) => round.deathId), ...drawn],
-            miracles: session.state.settings.miracles && mode !== 'showdown',
-          });
-        return { deathId: meta.id, zone: meta.zone };
-      },
-      potSips
-    ),
+      const meta =
+        forced ??
+        pickDeath({
+          pool,
+          rng,
+          // Auch innerhalb der Runde nicht wiederholen: Bei sieben Toden hintereinander
+          // fiele eine doppelte Sequenz sofort auf.
+          recent: [...session.state.rounds.slice(-4).map((round) => round.deathId), ...drawn],
+          miracles: session.state.settings.miracles && mode !== 'showdown',
+        });
+      return { deathId: meta.id, zone: meta.zone };
+    }),
   ...(dev
     ? {
         onTransition: ({ from, to, event }: Transition) => {

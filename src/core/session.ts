@@ -19,7 +19,7 @@ import {
   type Settings,
 } from '@/config/rules';
 import { COLOR_IDS, type ColorId, type HatId } from '@/config/theme';
-import { computeOdds, pickVictims, totalSips, type Bet, type PlayerId } from './lottery';
+import { computeOdds, pickVictims, type Bet, type PlayerId } from './lottery';
 import { createSeed, createSeededRng, type SeededRng } from './rng';
 import { createStore, type Unsubscribe } from './store';
 
@@ -54,15 +54,6 @@ export interface RoundSetup {
   extraDeaths: { deathId: DeathId; zone: DeathZone }[];
   mode: GameMode;
   durationPreset: DurationPreset;
-  /**
-   * Der Topf des **Turniers**, nicht der Runde.
-   *
-   * In Sudden Death wird einmal gesetzt und danach Runde fuer Runde geschossen (ADR-56).
-   * `bets` schrumpft dabei mit dem Teilnehmerfeld — was der Letzte verteilt, ist aber die
-   * Summe **aller** urspruenglichen Einsaetze. Ausserhalb eines Turniers ist das genau
-   * `totalSips(bets)`.
-   */
-  potSips: number;
 }
 
 export interface Drinker {
@@ -144,8 +135,7 @@ export function createRoundSetup(
   bets: readonly Bet[],
   mode: GameMode,
   durationPreset: DurationPreset,
-  chooseDeath?: ChooseDeath,
-  potSips?: number
+  chooseDeath?: ChooseDeath
 ): RoundSetup {
   const victims = pickVictims(bets, victimCount(mode, bets.length));
   const seed = createSeed();
@@ -178,7 +168,6 @@ export function createRoundSetup(
     extraDeaths: victims.slice(1).map((_, index) => draw(index + 1)),
     mode,
     durationPreset,
-    potSips: potSips ?? totalSips(bets),
   };
 }
 
@@ -287,8 +276,8 @@ export function resolveRound(setup: RoundSetup, finishedAt = Date.now()): RoundR
       };
       if (survivors.length === 1) {
         result.winnerId = survivors[0]!;
-        // Der Topf des ganzen Turniers, nicht nur der beiden Finalisten (ADR-56).
-        result.sipsToDistribute = setup.potSips;
+        // Nur der eigene Einsatz, nicht der Topf des Turniers (ADR-60).
+        result.sipsToDistribute = betOf(setup, survivors[0]!);
       }
       return result;
     }
@@ -312,32 +301,120 @@ export function scoreboard(session: Session): Record<PlayerId, number> {
 }
 
 /**
- * Im Modus "Sudden Death" ausgeschiedene Spieler — aus der Runden-History abgeleitet.
+ * Der Turnier-Block, zu dem die **zuletzt gespielte** Runde gehoert — inklusive ihrer
+ * selbst, entschieden oder nicht. Leer, wenn zuletzt gar kein Turnier lief.
  *
- * Nur das **laufende Turnier** zaehlt. Zwei Grenzen ziehen es ein (ADR-57):
+ * Zwei Grenzen ziehen den Block ein (ADR-57):
  *
  * 1. `session.tournamentFrom` — bei jedem `begin` neu gesetzt. Wer mitten im Turnier in die
  *    Lobby geht und neu startet, faengt mit vollem Feld an.
- * 2. Rueckwaerts bis zur letzten entschiedenen Runde (`winnerId`) oder bis zu einer Runde
- *    eines Modus, der gar nicht ausscheiden laesst. Ist das Turnier durch, treten in der
- *    naechsten Runde wieder alle an — ohne Knopf, ohne Verlust des Scoreboards.
+ * 2. Rueckwaerts bis zu einer entschiedenen Runde (`winnerId` — die gehoert zum *vorigen*
+ *    Turnier) oder zu einer Runde eines Modus, der gar nicht ausscheiden laesst.
  */
-export function eliminatedPlayerIds(session: Session): Set<PlayerId> {
+export function tournamentBlock(session: Session): RoundResult[] {
   const since = session.tournamentFrom ?? 0;
   const rounds = session.rounds.filter((round) => round.finishedAt > since);
+  const lastIndex = rounds.length - 1;
+  if (lastIndex < 0 || !MODE_SPECS[rounds[lastIndex]!.mode]?.eliminates) return [];
 
-  let start = rounds.length;
+  let start = lastIndex;
   while (start > 0) {
-    const round = rounds[start - 1]!;
-    if (round.winnerId !== undefined || !MODE_SPECS[round.mode]?.eliminates) break;
+    const previous = rounds[start - 1]!;
+    if (previous.winnerId !== undefined || !MODE_SPECS[previous.mode]?.eliminates) break;
     start -= 1;
   }
+  return rounds.slice(start);
+}
 
+/**
+ * Im Modus "Sudden Death" ausgeschiedene Spieler — aus der Runden-History abgeleitet.
+ *
+ * Hat die letzte Runde das Turnier entschieden, ist die Menge leer: In der naechsten Runde
+ * treten wieder alle an, ohne Knopf und ohne Verlust des Scoreboards (ADR-57).
+ */
+export function eliminatedPlayerIds(session: Session): Set<PlayerId> {
+  const block = tournamentBlock(session);
   const out = new Set<PlayerId>();
-  for (let i = start; i < rounds.length; i += 1) {
-    for (const id of rounds[i]!.eliminatedIds) out.add(id);
+  if (block[block.length - 1]?.winnerId !== undefined) return out;
+  for (const round of block) {
+    for (const id of round.eliminatedIds) out.add(id);
   }
   return out;
+}
+
+/** Eine Zeile der Einsatz-Tabelle. `null` heisst: noch geheim. */
+export interface StakeRow {
+  playerId: PlayerId;
+  sips: number | null;
+  chance: number | null;
+}
+
+/**
+ * Wer wird auf dem Result-Screen aufgedeckt?
+ *
+ * Ausserhalb eines Turniers alle — das ist der zweite Comedy-Moment des Spiels
+ * (GDD §3.7). **Im laufenden Sudden-Death-Turnier nur die Getroffenen** (ADR-60): Wer noch
+ * steht, behaelt seinen Einsatz bis zum Ende fuer sich.
+ *
+ * Zwei Feinheiten, ohne die die Geheimhaltung nichts wert waere:
+ *
+ * - Die Daten kommen aus dem ganzen Turnier-Block, nicht aus dieser einen Runde. `bets`
+ *   schrumpft mit dem Teilnehmerfeld, die frueher Gefallenen stehen gar nicht mehr drin.
+ * - Die **Chance** bleibt waehrend des Turniers auch bei den Aufgedeckten verdeckt. Sie ist
+ *   `eigener Einsatz / Summe aller Einsaetze`; wer sie sieht, rechnet die Summe aus — und
+ *   bei zwei Verbliebenen damit exakt den Einsatz des anderen.
+ */
+export function stakeReveal(session: Session, round: RoundResult): StakeRow[] {
+  // Absteigend nach Einsatz — die Mutigen stehen oben, das erzeugt das Gespraech.
+  const byStake = (a: StakeRow, b: StakeRow): number => (b.sips ?? 0) - (a.sips ?? 0);
+
+  const openAll = (): StakeRow[] =>
+    round.bets
+      .map((bet) => ({
+        playerId: bet.playerId,
+        sips: bet.sips,
+        chance: round.odds[bet.playerId] ?? 0,
+      }))
+      .sort(byStake);
+
+  const block = tournamentBlock(session);
+  if (block.length === 0) return openAll();
+
+  const decided = round.winnerId !== undefined;
+
+  /*
+   * Fuer jeden Spieler zaehlt die Runde, in der er gefallen ist — dort stand sein Einsatz
+   * und die Chance, mit der es ihn erwischt hat. Wer noch steht, wird beim letzten Stand
+   * gefuehrt.
+   */
+  const seen = new Map<PlayerId, { sips: number; chance: number; out: boolean }>();
+  for (const past of block) {
+    for (const bet of past.bets) {
+      if (seen.get(bet.playerId)?.out) continue;
+      seen.set(bet.playerId, {
+        sips: bet.sips,
+        chance: past.odds[bet.playerId] ?? 0,
+        out: past.eliminatedIds.includes(bet.playerId),
+      });
+    }
+  }
+
+  const open: StakeRow[] = [];
+  const secret: StakeRow[] = [];
+  for (const [playerId, entry] of seen) {
+    if (entry.out || decided) {
+      open.push({ playerId, sips: entry.sips, chance: decided ? entry.chance : null });
+    } else {
+      secret.push({ playerId, sips: null, chance: null });
+    }
+  }
+
+  /*
+   * Die verdeckten stehen **danach** und in Beitrittsreihenfolge: Wuerden sie mitsortiert,
+   * verriete allein ihre Position, wo ihr Einsatz liegt.
+   */
+  open.sort(byStake);
+  return [...open, ...secret];
 }
 
 /** Spieler, die in der naechsten Runde antreten. */
@@ -393,8 +470,6 @@ function sanitizeRounds(rounds: unknown): RoundResult[] {
       extraDeaths: Array.isArray(round.extraDeaths) ? round.extraDeaths : [],
       odds: typeof round.odds === 'object' && round.odds !== null ? round.odds : {},
       finishedAt: typeof round.finishedAt === 'number' ? round.finishedAt : 0,
-      // Vor ADR-56 gab es kein `potSips` — der Rundeneinsatz ist dort die richtige Antwort.
-      potSips: typeof round.potSips === 'number' ? round.potSips : totalSips(bets),
     });
   }
   return out;

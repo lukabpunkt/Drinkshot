@@ -382,6 +382,14 @@ test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-56)', async ({ pag
   await expect(page.locator('.result__sub')).toContainText('ist raus');
 
   /*
+   * Aufgedeckt wird nur, wen es getroffen hat (ADR-60). Die beiden Verbliebenen behalten
+   * ihren Einsatz — und ihre Chance, die sonst die Summe und damit die Einsaetze verriete.
+   */
+  await expect(page.locator('.result__summary')).toHaveText('Aufgedeckte Einsätze');
+  await expect(page.locator('.bets tbody tr')).toHaveCount(3);
+  await expect(page.locator('.bets__num.is-secret')).toHaveCount(5);
+
+  /*
    * Der entscheidende Schritt: "Weiter" fuehrt direkt auf den Start-Screen, **nicht**
    * zurueck in die Setzphase. Frueher wanderte das Handy erneut durch die Runde, obwohl
    * das Feld schon kleiner war.
@@ -396,6 +404,11 @@ test('Sudden Death: einmal setzen, dann Runde fuer Runde (ADR-56)', async ({ pag
   await expect(page.locator('.screen--result')).toBeVisible({ timeout: ARENA_TIMEOUT });
   await expect(page.locator('.result__crown')).toBeVisible();
   await expect(page.locator('.result__sub')).toContainText('verteilt');
+
+  // Jetzt liegt alles offen: drei Zeilen, kein einziges Fragezeichen mehr.
+  await expect(page.locator('.result__summary')).toHaveText('Alle Einsätze');
+  await expect(page.locator('.bets tbody tr')).toHaveCount(3);
+  await expect(page.locator('.bets__num.is-secret')).toHaveCount(0);
 
   /*
    * Und danach treten wieder alle drei an — vorher blieben Ausgeschiedene fuer immer
